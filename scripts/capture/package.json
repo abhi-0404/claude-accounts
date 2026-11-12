@@ -1,0 +1,7 @@
+{
+  "name": "claude-accounts-capture",
+  "private": true,
+  "description": "Builds the screenshots and animations in docs/media from fictional demo data.",
+  "scripts": { "capture": "node capture.js" },
+  "devDependencies": { "playwright-core": "1.49.1" }
+}

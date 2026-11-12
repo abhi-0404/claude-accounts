@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Stage</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { width: 100vw; height: 100vh; overflow: hidden; background: #181818; color: #cccccc; font: 13px "Segoe UI", sans-serif; }
+  .win { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; transform: scale(var(--k, 1)); display: grid; grid-template-rows: 32px 1fr 22px; background: #181818; }
+  .title { display: flex; align-items: center; justify-content: center; position: relative; color: #9d9d9d; font-size: 12px; border-bottom: 1px solid #2b2b2b; }
+  .title .dots { position: absolute; left: 14px; display: flex; gap: 8px; }
+  .title .dots i { width: 11px; height: 11px; border-radius: 50%; background: #3a3a3a; }
+  .main { display: grid; grid-template-columns: 48px 320px 1fr; min-height: 0; }
+  .activity { background: #181818; border-right: 1px solid #2b2b2b; display: flex; flex-direction: column; align-items: center; padding-top: 6px; gap: 2px; }
+  .activity .ico { width: 48px; height: 46px; display: grid; place-items: center; color: #858585; position: relative; }
+  .activity .ico.on { color: #fff; }
+  .activity .ico.on::before { content: ''; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; background: #0078d4; }
+  .activity svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  .side { border-right: 1px solid #2b2b2b; display: flex; flex-direction: column; min-height: 0; background: #181818; }
+  .side .head { height: 35px; display: flex; align-items: center; padding: 0 14px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #bbbbbb; flex: none; }
+  .side iframe { flex: 1; width: 100%; border: 0; min-height: 0; }
+  .editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #1f1f1f; }
+  .tabs { height: 35px; display: flex; background: #181818; border-bottom: 1px solid #2b2b2b; flex: none; }
+  .tab { display: flex; align-items: center; gap: 7px; padding: 0 14px; color: #9d9d9d; border-right: 1px solid #2b2b2b; font-size: 13px; white-space: nowrap; background: #181818; }
+  .tab.on { background: #1f1f1f; color: #fff; box-shadow: inset 0 1px 0 #0078d4; }
+  .tab svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+  .tab[hidden] { display: none; }
+  .body { position: relative; flex: 1; min-height: 0; }
+  .body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .code { position: absolute; inset: 0; padding: 14px 0; font: 13px/20px Consolas, "Cascadia Code", monospace; color: #cccccc; overflow: hidden; }
+  .code div { display: block; white-space: pre; }
+  .code b { display: inline-block; width: 46px; text-align: right; padding-right: 18px; color: #6e7681; font-weight: 400; }
+  .k { color: #569cd6; } .s { color: #ce9178; } .f { color: #dcdcaa; } .c { color: #6a9955; } .t { color: #4ec9b0; } .n { color: #b5cea8; }
+  .status { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; font-size: 12px; color: #9d9d9d; border-top: 1px solid #2b2b2b; background: #181818; }
+  .status span { margin-right: 14px; }
+  .status .acct { color: #ffffff; background: #0078d4; padding: 3px 8px; border-radius: 3px; margin-left: -4px; }
+  /* cursor, click ripple, caption */
+  #cursor { position: absolute; left: 0; top: 0; width: calc(26px * var(--k, 1)); height: calc(26px * var(--k, 1)); z-index: 50; pointer-events: none; transform: translate(-100px, -100px); filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+  #cursor.down svg { transform: scale(0.88); }
+  #cursor svg { transition: transform 0.08s ease; transform-origin: 3px 3px; }
+  .ripple { position: absolute; width: calc(14px * var(--k, 1)); height: calc(14px * var(--k, 1)); margin: calc(-7px * var(--k, 1)) 0 0 calc(-7px * var(--k, 1)); border-radius: 50%; border: 2px solid rgba(77,170,252,0.9); z-index: 49; pointer-events: none; animation: rip 0.5s ease-out forwards; }
+  @keyframes rip { from { transform: scale(0.4); opacity: 1; } to { transform: scale(3.2); opacity: 0; } }
+  #caption { position: absolute; left: 50%; bottom: calc(40px * var(--k, 1)); max-width: 90%; transform: translate(-50%, 10px); padding: calc(9px * var(--k, 1)) calc(18px * var(--k, 1)); border-radius: 999px; background: rgba(20,20,20,0.92); color: #fff; font-size: calc(15px * var(--k, 1)); font-weight: 600; letter-spacing: 0.01em; box-shadow: 0 6px 24px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.1); opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease; z-index: 60; pointer-events: none; white-space: nowrap; }
+  #caption.on { opacity: 1; transform: translate(-50%, 0); }
+</style></head>
+<body>
+<div class="win">
+  <div class="title"><div class="dots"><i></i><i></i><i></i></div><span id="wintitle">storefront-api</span></div>
+  <div class="main">
+    <div class="activity">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="M15 15l5 5"/></svg></div>
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="7" cy="6" r="2"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="9" r="2"/><path d="M7 8v8M17 11c0 4-6 2-9.5 5"/></svg></div>
+      <div class="ico on"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3.2 2.4-5.2 5.5-5.2s5.5 2 5.5 5.2"/><path d="M16 5.2a3 3 0 010 5.6M18 14.4c1.8.7 2.8 2.3 2.8 4.6"/></svg></div>
+    </div>
+    <div class="side"><div class="head">Claude Accounts</div><iframe id="panel" src="/panel.html"></iframe></div>
+    <div class="editor">
+      <div class="tabs">
+        <div class="tab" id="tab-code"><svg viewBox="0 0 16 16"><path d="M4 1.5h5l3.5 3.5v9a.5.5 0 01-.5.5H4a.5.5 0 01-.5-.5V2a.5.5 0 01.5-.5z"/></svg>orders.ts</div>
+        <div class="tab on" id="tab-chat" hidden><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg><span id="chat-title">New chat</span></div>
+      </div>
+      <div class="body">
+        <div class="code" id="code">
+<div><b>1</b><span class="k">import</span> { <span class="t">Router</span> } <span class="k">from</span> <span class="s">'express'</span>;</div>
+<div><b>2</b><span class="k">import</span> { <span class="f">totalFor</span> } <span class="k">from</span> <span class="s">'./pricing'</span>;</div>
+<div><b>3</b></div>
+<div><b>4</b><span class="k">export const</span> orders = <span class="f">Router</span>();</div>
+<div><b>5</b></div>
+<div><b>6</b>orders.<span class="f">post</span>(<span class="s">'/checkout'</span>, <span class="k">async</span> (req, res) =&gt; {</div>
+<div><b>7</b>  <span class="k">const</span> items = req.body.items <span class="k">as</span> <span class="t">CartItem</span>[];</div>
+<div><b>8</b>  <span class="c">// BUG: float math drifts by a cent on large carts</span></div>
+<div><b>9</b>  <span class="k">const</span> total = items.<span class="f">reduce</span>((sum, i) =&gt; sum + i.price * i.qty, <span class="n">0</span>);</div>
+<div><b>10</b>  res.<span class="f">json</span>({ total: <span class="f">totalFor</span>(total) });</div>
+<div><b>11</b>});</div>
+        </div>
+        <iframe id="chat" src="/chat.html" hidden></iframe>
+      </div>
+    </div>
+  </div>
+  <div class="status"><div><span class="acct" id="status-acct">Work · 18%</span><span>main</span><span>0 errors</span></div><div><span>TypeScript</span><span>UTF-8</span></div></div>
+</div>
+<div id="cursor"><svg viewBox="0 0 26 26" width="100%" height="100%"><path d="M3 2l0 17 4.4-4.2 3 6.7 3-1.4-3-6.6 6.2-.3z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg></div>
+<div id="caption"></div>
+<script>
+  const K = Number(new URLSearchParams(location.search).get('k')) || 1;
+  document.documentElement.style.setProperty('--k', K);
+  const $ = (s) => document.querySelector(s);
+  window.stage = {
+    showChat(on, title) {
+      $('#tab-chat').hidden = !on;
+      $('#chat').hidden = !on;
+      $('#code').style.display = on ? 'none' : '';
+      $('#tab-code').classList.toggle('on', !on);
+      if (title) $('#chat-title').textContent = title;
+    },
+    status(text) { $('#status-acct').textContent = text; },
+    caption(text, x, y) {
+      const c = $('#caption');
+      if (x != null) c.style.left = x * K + 'px';
+      if (y != null) { c.style.bottom = 'auto'; c.style.top = y * K + 'px'; }
+      if (text) { c.textContent = text; c.classList.add('on'); } else c.classList.remove('on');
+    },
+    cursor(x, y) { $('#cursor').style.transform = `translate(${x}px, ${y}px)`; },
+    press(on) { $('#cursor').classList.toggle('down', on); },
+    ripple(x, y) {
+      const r = document.createElement('div');
+      r.className = 'ripple'; r.style.left = x + 'px'; r.style.top = y + 'px';
+      document.body.appendChild(r); setTimeout(() => r.remove(), 600);
+    },
+  };
+  window.addEventListener('message', (e) => {
+    const m = e.data || {};
+    if (m.demo === 'newSession') { window.stage.showChat(true, 'New chat'); }
+    if (m.demo === 'switched') window.stage.status({ Work: 'Work · 18%', Personal: 'Personal · 72%', Studio: 'Studio · 0%' }[m.label] || m.label);
+  });
+</script>
+</body></html>

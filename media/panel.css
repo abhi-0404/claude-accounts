@@ -1,0 +1,634 @@
+/* Claude Accounts panel. Colors come from the VS Code theme so it fits light, dark and high contrast. */
+:root {
+  --fg: var(--vscode-foreground);
+  --muted: var(--vscode-descriptionForeground);
+  --line: var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.22)));
+  --hover: var(--vscode-list-hoverBackground);
+  --sel: var(--vscode-list-inactiveSelectionBackground);
+  --focus: var(--vscode-focusBorder);
+  --link: var(--vscode-textLink-foreground);
+  --soft: rgba(128, 128, 128, 0.13);
+  --softer: rgba(128, 128, 128, 0.24);
+  --track: rgba(128, 128, 128, 0.22);
+  --fill: color-mix(in srgb, var(--vscode-foreground) 70%, transparent);
+  --warn: var(--vscode-editorWarning-foreground, #cca700);
+  --err: var(--vscode-errorForeground, #f14c4c);
+  --ok: var(--vscode-testing-iconPassed, #73c991);
+  --pad: 14px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+/* Vertical scrollbar only when the content is taller than the panel, and its thumb only while you
+   point at or scroll the panel (like VS Code's own lists). Its space is reserved, so nothing shifts. */
+html { overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+/* VS Code's default webview style sets scrollbar-color, which makes Chromium ignore the slim
+   ::-webkit-scrollbar rules below and draw its thick overlay bar on top of the content. */
+html, body, * { scrollbar-color: auto; scrollbar-width: auto; }
+main { min-width: 0; max-width: 100%; overflow-x: hidden; }
+/* Slim ghost scrollbar: 4px, rounded, hidden at rest and shown only while the panel is scrolling. */
+::-webkit-scrollbar { width: 4px; height: 0; background: transparent; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
+html.scrolling ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--vscode-scrollbarSlider-background, rgba(121, 121, 121, 0.4)) 80%, transparent);
+}
+html.scrolling ::-webkit-scrollbar-thumb:hover { background: var(--vscode-scrollbarSlider-hoverBackground, rgba(100, 100, 100, 0.7)); }
+html.scrolling ::-webkit-scrollbar-thumb:active { background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4)); }
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--fg);
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+button:disabled { cursor: default; opacity: 0.45; }
+:focus { outline: none; }
+:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.muted { color: var(--muted); }
+
+/* ---------- Accounts (top) ---------- */
+.accounts { padding: 4px 0 8px; }
+.group-head { display: flex; align-items: center; height: 26px; padding: 0 8px 0 6px; }
+.toggle {
+  display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; height: 100%;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.toggle svg { width: 14px; height: 14px; transition: transform 0.12s ease; }
+.group-head .toggle { color: var(--muted); }
+.count { font-weight: 400; letter-spacing: 0; margin-left: 2px; }
+.closed > .group-head .toggle svg, .sec.closed .sec-head .toggle svg { transform: rotate(-90deg); }
+.closed > .group-body { display: none; }
+
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 22px; height: 22px; border-radius: 4px; color: var(--muted);
+}
+.icon-btn:hover { background: var(--vscode-toolbar-hoverBackground, var(--softer)); color: var(--fg); }
+
+/* Columns line up across all accounts: avatar | name | 5h | weekly | button. */
+.acct {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px 38px 58px; align-items: center; column-gap: 6px; height: 28px;
+  padding: 0 10px 0 calc(var(--pad) + 6px); cursor: pointer;
+}
+.acct-col { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.acct-col .warn { color: var(--warn); }
+.acct-col .full { color: var(--err); }
+.acct-col .tag { opacity: 0.7; margin-right: 4px; }
+.acct-head {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr) 38px 38px 58px; column-gap: 6px; height: 18px; align-items: end;
+  padding: 0 10px 0 calc(var(--pad) + 6px); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); opacity: 0.8;
+}
+.acct-head span { text-align: right; }
+.acct-head .first { grid-column: 3; }
+.acct:hover { background: var(--hover); }
+.acct.sel { background: var(--sel); }
+.avatar {
+  position: relative; flex: none; width: 18px; height: 18px; border-radius: 50%;
+  display: inline-grid; place-items: center; font-size: 10px; font-weight: 700;
+  color: var(--c); background: color-mix(in srgb, var(--c) 24%, transparent);
+}
+.signedOut .avatar, .checking .avatar { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--muted); }
+.active .avatar::after {
+  content: ''; position: absolute; right: -2px; bottom: -2px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ok); box-shadow: 0 0 0 2px var(--vscode-sideBar-background, #1e1e1e);
+}
+.acct-name { min-width: 0; display: flex; align-items: center; gap: 4px; }
+.acct-alert { display: inline-flex; flex: none; }
+.acct-alert svg { width: 13px; height: 13px; }
+.acct-alert.reminder { color: var(--link); }
+.acct-alert.final { color: var(--warn); animation: ring 2.4s ease-in-out infinite; }
+@keyframes ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(14deg); } 80% { transform: rotate(-12deg); } 85% { transform: rotate(8deg); } 90% { transform: rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .acct-alert.final { animation: none; } }
+/* Compact alert: headline + Start on one line, key numbers on the next; details on hover. */
+.alert.compact { gap: 2px; padding: 7px 10px; margin: 4px 0 8px; }
+.alert-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.alert-head .alert-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-line { font-size: 12px; color: var(--muted); padding-left: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn.tiny { height: 20px; padding: 0 9px; font-size: 11px; border-radius: 10px; flex: none; }
+.acct-side { display: flex; align-items: center; justify-content: flex-end; }
+.badge {
+  font-size: 11px; line-height: 18px; padding: 0 8px; border-radius: 9px;
+  color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent);
+}
+.pill {
+  font-size: 11px; line-height: 18px; padding: 0 9px; border-radius: 9px;
+  background: var(--soft); box-shadow: inset 0 0 0 1px var(--line);
+}
+.pill:hover { background: var(--softer); }
+.link { color: var(--link); font-size: 12px; }
+.link:hover { text-decoration: underline; }
+
+/* ---------- Sections ---------- */
+.sec { border-top: 1px solid var(--line); }
+.sec-head { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 var(--pad) 0 6px; }
+.sec-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.sec-actions .link { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.sec-actions .link:hover { color: var(--fg); }
+.head-note { font-size: 11px; color: var(--muted); }
+.sec.closed .sec-body { display: none; }
+.sec-body { padding: 0 var(--pad) 12px; }
+
+.sub {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  margin: 10px 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+}
+.sub:first-child { margin-top: 2px; }
+.sub-note { font-weight: 400; letter-spacing: 0; text-transform: none; }
+.sub-right { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.sub-right .sub-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.icon-btn.sync { width: 20px; height: 20px; }
+.icon-btn.sync svg { width: 14px; height: 14px; }
+.icon-btn.sync.spin svg { animation: spin 0.9s linear infinite; }
+.icon-btn.sync:disabled { opacity: 1; cursor: default; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.warn-note { color: var(--warn); font-size: 12px; }
+
+/* Out-of-usage banner */
+.banner {
+  display: flex; flex-direction: column; gap: 8px; margin: 8px 10px 4px; padding: 10px 12px; border-radius: 6px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.banner .btn { align-self: flex-start; }
+
+/* Account row: session usage at a glance */
+/* Narrow sidebar: drop the weekly column's tag and tighten columns. */
+@media (max-width: 250px) {
+  .acct, .acct-head { grid-template-columns: 18px minmax(0, 1fr) 34px 34px 54px; column-gap: 4px; }
+  .acct-col .tag { display: none; }
+}
+
+/* Weekly plan */
+.small { font-size: 11px; }
+.alert {
+  display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; padding: 10px 12px; border-radius: 6px;
+  background: color-mix(in srgb, var(--link) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--link) 35%, transparent);
+}
+.alert.urgent {
+  background: color-mix(in srgb, var(--warn) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.alert-title { font-weight: 600; }
+.alert .btn { align-self: flex-start; margin-top: 2px; }
+.stats { display: flex; gap: 8px; margin: 4px 0 8px; }
+.stat { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; background: var(--soft); }
+.stat-num { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-label { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 250px) { .stats { flex-wrap: wrap; } .stat { flex-basis: 40%; } }
+
+/* Usage history timeline */
+.range { margin: 4px 0 8px; }
+.chart { margin: 2px 0 6px; }
+.plot { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.plot.sessions { height: 72px; }
+.plot.weekly { height: 44px; }
+.band { position: absolute; top: 0; bottom: 0; }
+.band.alt { background: color-mix(in srgb, var(--fg) 4%, transparent); }
+.gl { position: absolute; left: 0; right: 0; border-top: 1px dashed color-mix(in srgb, var(--muted) 25%, transparent); }
+.mark { position: absolute; top: 0; bottom: 0; width: 0; z-index: 2; }
+.mark::after { content: ''; position: absolute; top: 0; bottom: 0; left: -4px; width: 9px; }
+.mark.reset { border-left: 1px dashed color-mix(in srgb, var(--warn) 70%, transparent); }
+.mark.now { border-left: 1px solid color-mix(in srgb, var(--link) 35%, transparent); }
+.sbar {
+  position: absolute; bottom: 0; min-width: 3px; z-index: 1; cursor: default;
+  border-radius: 3px 3px 0 0; background: var(--fill); box-shadow: inset 1px 0 0 var(--vscode-sideBar-background, #1e1e1e);
+}
+.sbar:hover, .sbar:focus-visible { background: var(--fg); outline: none; }
+.sbar.current { background: var(--link); }
+.plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.plot svg path { fill: none; stroke: var(--link); stroke-width: 2px; stroke-linejoin: round; }
+.empty-plot { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--muted); }
+.xlabels { position: relative; height: 16px; font-size: 10px; color: var(--muted); }
+.xlabels span { position: absolute; top: 2px; overflow: hidden; white-space: nowrap; text-overflow: clip; padding-left: 2px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+.tbl th { font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); text-align: right; padding: 2px 0 4px; }
+.tbl td { text-align: right; padding: 3px 0; border-top: 1px solid var(--line); }
+.tbl th:first-child, .tbl td:first-child { text-align: left; }
+.tbl tr.cur td { color: var(--link); }
+.tip {
+  position: fixed; z-index: 50; display: none; max-width: 240px; padding: 6px 8px; border-radius: 4px; white-space: pre-line;
+  font-size: 12px; line-height: 1.4; pointer-events: none;
+  color: var(--vscode-editorHoverWidget-foreground, var(--fg)); background: var(--vscode-editorHoverWidget-background, #252526);
+  box-shadow: 0 0 0 1px var(--vscode-editorHoverWidget-border, var(--line)), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.tip { min-width: 190px; white-space: normal; }
+.tip-title { font-weight: 600; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tip-row { display: flex; justify-content: space-between; gap: 14px; line-height: 1.6; color: var(--muted); }
+.tip-row b { color: var(--vscode-editorHoverWidget-foreground, var(--fg)); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Reordering accounts */
+.acct[draggable="true"] { cursor: grab; }
+.acct.dragging { opacity: 0.45; }
+.acct.drop-before { box-shadow: inset 0 2px 0 var(--focus); }
+.acct.drop-after { box-shadow: inset 0 -2px 0 var(--focus); }
+
+/* Projects */
+.proj {
+  display: flex; align-items: center; gap: 8px; height: 28px; margin: 0 -6px; padding: 0 6px;
+  border-radius: 4px; cursor: pointer;
+}
+.proj:hover { background: var(--hover); }
+.proj svg { width: 14px; height: 14px; color: var(--muted); }
+.proj.current { background: var(--sel); }
+.proj.current svg { color: var(--fg); }
+.live-dot {
+  display: inline-block; width: 7px; height: 7px; margin-left: 4px; border-radius: 50%; vertical-align: 1px;
+  background: var(--ok); animation: pulse 2s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+.kv { display: flex; align-items: baseline; gap: 12px; min-height: 26px; padding: 3px 0; }
+.kv .k { flex: none; }
+.kv .v { flex: 1; text-align: right; }
+.note { color: var(--muted); margin: 6px 0 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 12px; border-radius: 3px;
+  background: var(--vscode-button-background); color: var(--vscode-button-foreground);
+}
+.btn:hover { background: var(--vscode-button-hoverBackground); }
+.btn.secondary { background: var(--vscode-button-secondaryBackground, var(--soft)); color: var(--vscode-button-secondaryForeground, var(--fg)); }
+.btn.secondary:hover { background: var(--vscode-button-secondaryHoverBackground, var(--softer)); }
+
+/* Meters: label and value on one line, a thin bar, then a muted footnote. */
+.meter { padding: 6px 0 8px; }
+.meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.pct { flex: none; font-variant-numeric: tabular-nums; }
+.bar { height: 4px; margin-top: 7px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: inherit; background: var(--fill); transition: width 0.45s ease; }
+.meter.warn .bar i { background: var(--warn); }
+.meter.warn .pct { color: var(--warn); }
+.meter.full .bar i { background: var(--err); }
+.meter.full .pct { color: var(--err); }
+.meter-foot { margin-top: 5px; font-size: 12px; color: var(--muted); }
+
+/* Segmented control (This folder / All, 5h / 7d / All). */
+.seg { display: flex; padding: 2px; border-radius: 6px; background: var(--soft); box-shadow: inset 0 0 0 1px var(--line); }
+.seg button {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+  height: 26px; padding: 0 8px; border-radius: 4px; color: var(--muted); white-space: nowrap;
+}
+.seg button span { overflow: hidden; text-overflow: ellipsis; }
+.seg button:not(:disabled):hover { color: var(--fg); }
+.seg button.on { background: var(--softer); color: var(--fg); }
+.seg-sm { padding: 1px; border-radius: 5px; }
+.seg-sm button { height: 20px; padding: 0 7px; font-size: 11px; }
+
+/* ---------- Session manager ---------- */
+.new-session {
+  display: flex; align-items: center; gap: 8px; width: calc(100% + 12px); height: 30px;
+  margin: 0 -6px 8px; padding: 0 6px; border-radius: 4px; font-weight: 600;
+}
+.new-session:hover { background: var(--hover); }
+.toolbar { display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; flex: none; height: 26px; padding: 0 8px;
+  border-radius: 4px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.chip:hover { background: var(--hover); color: var(--fg); }
+.chip.on { background: var(--softer); color: var(--fg); }
+.chip.live svg { color: var(--ok); }
+.search {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 7px;
+  border-radius: 4px; color: var(--muted);
+  background: var(--vscode-input-background); box-shadow: inset 0 0 0 1px var(--vscode-input-border, transparent);
+}
+.search:focus-within { box-shadow: inset 0 0 0 1px var(--focus); }
+.search svg { width: 14px; height: 14px; }
+.search input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent;
+  color: var(--vscode-input-foreground); font: inherit;
+}
+.search input::placeholder { color: var(--vscode-input-placeholderForeground, var(--muted)); }
+.search .icon-btn { width: 18px; height: 18px; visibility: hidden; }
+.search.has-q .icon-btn { visibility: visible; }
+
+.folder-head {
+  display: flex; align-items: center; gap: 6px; margin: 10px 0 2px; font-size: 11px; color: var(--muted);
+}
+.folder-head svg { width: 13px; height: 13px; }
+.folder-head .count { margin-left: auto; }
+.sess {
+  position: relative; display: flex; align-items: center; gap: 8px; height: 28px;
+  margin: 0 -6px; padding: 0 6px; border-radius: 4px; cursor: pointer;
+}
+.sess:hover { background: var(--hover); }
+.sdot { flex: none; width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.3px var(--muted); }
+.sdot.live { background: var(--ok); box-shadow: none; animation: pulse 2s ease-out infinite; }
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 5px transparent; }
+}
+.stitle { flex: 1; }
+.stitle mark { background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33)); color: inherit; border-radius: 2px; }
+.sfolder { display: none; flex: 0 1 auto; max-width: 38%; font-size: 12px; color: var(--muted); }
+.sage { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sactions { display: none; flex: none; gap: 2px; }
+.sactions .icon-btn { width: 20px; height: 20px; }
+.sess:hover .sactions, .sess:focus-within .sactions { display: flex; }
+.sess:hover .sage, .sess:focus-within .sage { display: none; }
+.more { display: block; margin: 8px auto 0; }
+.empty { color: var(--muted); padding: 10px 0 4px; }
+.empty .link { font-size: inherit; }
+
+/* ---------- Responsive ---------- */
+@media (min-width: 400px) {
+  :root { --pad: 18px; }
+  .flat .sfolder { display: block; }
+}
+@media (max-width: 250px) {
+  :root { --pad: 10px; }
+  .acct { padding-left: calc(var(--pad) + 2px); }
+  .kv { display: block; }
+  .kv .v { display: block; text-align: left; color: var(--muted); }
+  .toolbar { flex-wrap: wrap; }
+  .search { flex-basis: 100%; order: -1; }
+  .seg button svg { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdot.live { animation: none; }
+  .bar i, .toggle svg { transition: none; }
+}
+.hint { font-size: 11px; color: var(--muted); padding: 4px 10px 6px calc(var(--pad) + 30px); }
+.hint .link { font-size: inherit; }
+
+/* ---------- Usage: one section (limits, then History or Models) ---------- */
+.sec-body > #limits .who { font-size: 11px; color: var(--muted); margin: -2px 0 6px; }
+.utab { margin: 12px 0 6px; }
+.utab button { flex: 1; justify-content: center; }
+#scope button { flex: 1; min-width: 0; }
+
+/* ---------- Chats & projects: what (Chats | Projects) and whose (account | All) ---------- */
+.lists { display: flex; align-items: center; gap: 6px; }
+.lists #kind { flex: 1; min-width: 0; }
+.lists #who { flex: none; max-width: 45%; }
+.lists #who button { flex: 0 1 auto; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.lists #who[hidden] { display: none; }
+#kind .n { font-size: 11px; opacity: 0.7; font-variant-numeric: tabular-nums; }
+.owners { display: inline-flex; gap: 2px; flex: none; }
+.owner {
+  display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%;
+  font-size: 9px; font-weight: 700; color: var(--vscode-editor-background, #1e1e1e); background: var(--c);
+}
+.pcount { flex: none; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.folder-head.current { color: var(--fg); }
+.folder-head .badge { margin-left: 6px; }
+.chip[hidden] { display: none; }
+@media (max-width: 260px) {
+  #kind .n { display: none; }
+}
+.unlinked { font-size: 11px; color: var(--muted); padding: 6px 2px 0; }
+.lists #kind svg { display: none; }
+.lists #who button { max-width: 76px; }
+
+/* ---------- The list scrolls on its own, so Accounts above and Usage below stay in reach ---------- */
+#session-list {
+  max-height: clamp(180px, 46vh, 560px); overflow-y: auto; overflow-x: hidden;
+  margin: 0 -6px; padding: 0 6px 4px; overscroll-behavior: contain;
+  /* soft edge at the bottom says "more below" without a heavy border */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
+}
+#session-list::-webkit-scrollbar { width: 4px; }
+/* Project groups: one quiet line each, fold with a click, stay on top while their chats scroll. */
+#session-list .folder-head {
+  position: sticky; top: 0; z-index: 1; width: calc(100% + 12px); margin: 6px -6px 0; padding: 4px 6px; border-radius: 0;
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background)); cursor: pointer;
+}
+#session-list .folder-head:first-child { margin-top: 0; }
+#session-list .folder-head:hover { color: var(--fg); }
+#session-list .folder-head > svg { width: 12px; height: 12px; transition: transform 0.12s ease; }
+#session-list .folder-head.folded > svg { transform: rotate(-90deg); }
+
+/* ---------- Usage, simplified: two limits up front, everything else one click away ---------- */
+.usage-head { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: var(--muted); }
+.usage-head .age { font-variant-numeric: tabular-nums; margin-right: 1px; }
+.usage-head .live-dot { margin-right: 4px; }
+.usage-head .icon-btn { width: 20px; height: 20px; }
+.meter { padding: 4px 0 7px; }
+.meter-top .when { font-size: 11px; color: var(--muted); margin-left: 4px; font-weight: 400; }
+.details-toggle {
+  display: flex; align-items: center; gap: 4px; width: calc(100% + 12px); height: 26px; margin: 4px -6px 0; padding: 0 6px;
+  border-radius: 4px; font-size: 12px; color: var(--muted);
+}
+.details-toggle:hover { background: var(--hover); color: var(--fg); }
+.details-toggle svg { width: 12px; height: 12px; transform: rotate(-90deg); transition: transform 0.12s ease; }
+.details-toggle.open svg { transform: none; }
+.details-bar { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.details-bar .utab { flex: 1; margin: 0; }
+.mini-select {
+  flex: none; height: 22px; padding: 0 4px; border-radius: 4px; font: inherit; font-size: 11px; cursor: pointer;
+  color: var(--vscode-dropdown-foreground, var(--fg)); background: var(--vscode-dropdown-background, var(--soft));
+  border: 1px solid var(--vscode-dropdown-border, var(--line));
+}
+.mini-select:focus { border-color: var(--focus); }
+.summary { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+.summary b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.summary .dotsep { margin: 0 6px; opacity: 0.6; }
+.plot svg { pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 10px; color: var(--muted); margin: 2px 0 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.lg-bar { width: 6px; height: 9px; border-radius: 1px; background: var(--fill); }
+.lg-line { width: 12px; height: 2px; border-radius: 1px; background: var(--link); }
+.more-table { margin-top: 4px; }
+.more-table summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 3px 0; list-style-position: inside; }
+.more-table summary:hover { color: var(--fg); }
+.more-table[open] summary { margin-bottom: 4px; }
+.plot.sessions svg path { stroke: var(--vscode-charts-orange, #d18616); stroke-width: 1.5px; }
+.lg-line { background: var(--vscode-charts-orange, #d18616); }
+
+/* ---------- Days left on the weekly limit ---------- */
+.meter-top .left-pill {
+  flex: none; margin-left: auto; padding: 0 6px; height: 16px; line-height: 16px; border-radius: 8px;
+  font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--fg); background: var(--softer);
+}
+.meter-top .left-pill + .pct { margin-left: 0; }
+
+/* ---------- Chart: weekly line on top, points you can hover, zoom ---------- */
+.chart { overflow-x: auto; overflow-y: hidden; }
+.chart::-webkit-scrollbar { height: 4px; }
+.chart.z2, .chart.z4 { cursor: grab; }
+.chart.dragging { cursor: grabbing; user-select: none; }
+.chart-inner { min-width: 100%; }
+.plot.sessions { height: 84px; overflow: visible; }
+.chart.z2 .plot.sessions { height: 130px; }
+.chart.z4 .plot.sessions { height: 170px; }
+.sbar { opacity: 0.8; }
+.plot.sessions svg { z-index: 3; pointer-events: none; }
+.plot.sessions svg path { stroke: var(--vscode-charts-orange, #d18616); stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; }
+.plot.sessions svg path.halo { stroke: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e)); stroke-width: 5.5px; }
+.wdot {
+  position: absolute; z-index: 4; width: 7px; height: 7px; margin: 0 0 -3.5px -3.5px; border-radius: 50%;
+  background: var(--vscode-charts-orange, #d18616); box-shadow: 0 0 0 1.5px var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
+  cursor: default;
+}
+.wdot::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; } /* easier to hit */
+.wdot:hover, .wdot:focus-visible { transform: scale(1.5); outline: none; }
+.wdot.nowdot { width: 9px; height: 9px; margin: 0 0 -4.5px -4.5px; }
+.legend { align-items: center; }
+.legend .zoom { margin-left: auto; gap: 0; }
+.legend .zoom .icon-btn { width: 20px; height: 20px; }
+.legend .zoom svg { width: 13px; height: 13px; }
+
+/* ---------- History & models: two dropdowns, steady height, numbers with captions ---------- */
+.details-bar { justify-content: flex-start; }
+.details-bar .mini-select { flex: 0 1 auto; min-width: 0; }
+#usage-more { min-height: 204px; } /* same height for History and Models, so switching does not jump */
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 2px 0 8px; }
+.fact { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; cursor: default; }
+.fact b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap { font-size: 10px; color: var(--muted); margin: 0 0 2px; }
+.gl i { position: absolute; right: 2px; top: 1px; font-size: 9px; font-style: normal; line-height: 1; color: var(--muted); opacity: 0.7; pointer-events: none; }
+.plot.sessions { margin-top: 2px; }
+.legend .lg-bars { color: var(--muted); }
+.legend .lg-week { color: var(--vscode-charts-orange, #d18616); }
+.legend span[title] { cursor: default; }
+
+/* ---------- Chart, reworked: quiet bars behind, one clean weekly line in front, mouse tracker ---------- */
+.details-bar .utab { flex: 1; margin: 0; }
+.plot.sessions { cursor: crosshair; }
+.sbar { opacity: 0.45; border-radius: 2px 2px 0 0; }
+.sbar.current { opacity: 0.7; }
+.sbar:hover { background: var(--fill); }
+.sbar.current:hover { background: var(--link); }
+.plot.sessions svg path { stroke-width: 2px; }
+.plot.sessions svg path.halo { stroke-width: 4.5px; }
+.plot.sessions svg path.area { stroke: none; fill: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 12%, transparent); }
+.wdot { pointer-events: none; }
+.wdot.nowdot { width: 7px; height: 7px; margin: 0 0 -3.5px -3.5px; }
+.track { position: absolute; top: 0; bottom: 0; width: 0; z-index: 5; pointer-events: none; border-left: 1px solid color-mix(in srgb, var(--fg) 45%, transparent); }
+.track[hidden] { display: none; }
+.track i {
+  position: absolute; left: -5px; width: 9px; height: 9px; margin-bottom: -4.5px; border-radius: 50%;
+  background: var(--vscode-charts-orange, #d18616); box-shadow: 0 0 0 2px var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
+}
+.track i[hidden] { display: none; }
+.tip { pointer-events: none; }
+
+/* ---------- One weekly frame: dotted reset lines, week navigation, line-only hover ---------- */
+.weeknav { display: flex; align-items: center; gap: 4px; margin: 2px 0 6px; }
+.weeknav .icon-btn { width: 22px; height: 22px; }
+.weeknav .icon-btn svg { width: 14px; height: 14px; }
+.weeklabel { flex: 1; min-width: 0; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; cursor: default; }
+.weeklabel em { margin-left: 6px; font-style: normal; font-size: 10px; color: var(--muted); }
+.mark.reset { border-left: 1px dotted color-mix(in srgb, var(--fg) 70%, transparent); }
+.mark.reset.end { left: 100%; margin-left: -1px; }
+.mark.reset::after, .mark.now::after { display: none; }
+.future {
+  position: absolute; top: 0; bottom: 0; right: 0; pointer-events: none;
+  background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--fg) 6%, transparent) 5px 6px);
+}
+.plot.sessions { cursor: grab; }
+.plot.sessions.online { cursor: crosshair; }
+.chart.dragging, .chart.dragging .plot.sessions { cursor: grabbing; }
+.chart-inner { transition: transform 0.15s ease; }
+.chart.dragging .chart-inner { transition: none; }
+.chart:focus-visible { outline: 1px solid var(--focus); outline-offset: 1px; }
+.sbar:hover, .sbar.current:hover { background: var(--fill); }
+.sbar.current:hover { background: var(--link); }
+
+/* ---------- Dropdowns follow the theme (the list used to be the browser's white) ---------- */
+body.vscode-dark select, body.vscode-high-contrast select { color-scheme: dark; }
+body.vscode-light select, body.vscode-high-contrast-light select { color-scheme: light; }
+select, select option, select optgroup {
+  background-color: var(--vscode-dropdown-background, var(--vscode-editor-background, #3c3c3c));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+}
+select option:checked, select option:hover { background-color: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground)); color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground)); }
+.mini-select[hidden] { display: none; }
+
+/* ---------- Monthly frame ---------- */
+.plot svg { clip-path: inset(-4px 0); } /* a curve running past the frame (a week that started last month) is cut at the edges */
+.mini-select[hidden] { display: block; }
+.plot.sessions { overflow-x: clip; overflow-y: visible; }
+
+/* A session bar lights up while its tooltip shows */
+.sbar { cursor: default; }
+.sbar.hot { opacity: 0.9; background: var(--fill); }
+.sbar.current.hot { background: var(--link); }
+
+/* Possible sessions (only while the bell shows) */
+.possible { margin: 2px 0 8px; padding: 6px 8px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 5%, transparent); display: flex; flex-direction: column; gap: 5px; }
+.possible-top { display: flex; align-items: center; gap: 6px; justify-content: space-between; min-width: 0; }
+.possible-top > span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.possible-top .acct-alert { display: inline-flex; }
+.slots { display: flex; flex-wrap: wrap; gap: 3px; }
+.slot { width: 12px; height: 14px; border-radius: 2px; background: color-mix(in srgb, var(--muted) 25%, transparent); }
+.slot.use { background: var(--vscode-progressBar-background, var(--link)); }
+.slot.now { outline: 1px solid var(--fg); outline-offset: 1px; }
+.possible.final .slot.use { background: var(--warn); }
+.possible-foot { font-size: 11px; color: var(--muted); }
+
+/* ---------- Chats & projects, reimagined: tabs, one search line, one scope switch ---------- */
+.lists { display: flex; align-items: flex-end; gap: 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.tabs { flex: 1; min-width: 0; display: flex; gap: 14px; }
+.tabs button {
+  position: relative; display: inline-flex; align-items: baseline; gap: 5px; height: 26px; padding: 0 1px;
+  color: var(--muted); white-space: nowrap;
+}
+.tabs button:hover { color: var(--fg); }
+.tabs button.on { color: var(--fg); font-weight: 600; }
+.tabs button.on::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 1px; background: var(--vscode-focusBorder, var(--link)); }
+.tabs .n { font-size: 11px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scope-btn {
+  display: inline-flex; align-items: center; gap: 5px; flex: none; height: 22px; margin-bottom: 3px; padding: 0 8px;
+  border-radius: 11px; font-size: 11px; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); white-space: nowrap;
+}
+.scope-btn svg { width: 13px; height: 13px; }
+.scope-btn:hover { color: var(--fg); background: var(--hover); }
+.scope-btn.on { color: var(--fg); background: var(--softer); box-shadow: inset 0 0 0 1px var(--focus); }
+.scope-btn[hidden] { display: none; }
+.toolbar { margin: 0 0 4px; }
+.scope-note { font-size: 11px; color: var(--muted); margin: 0 0 6px; min-height: 0; }
+.scope-note:empty { display: none; }
+@media (max-width: 260px) { .scope-btn span { display: none; } .scope-btn { padding: 0 6px; } }
+
+/* ---------- Account pictures: one fixed color everywhere; accounts differ by letter only ---------- */
+.avatar, .owner {
+  color: var(--link); background: color-mix(in srgb, var(--link) 20%, transparent);
+}
+.avatar { border-radius: 5px; font-weight: 600; }
+.owner { border-radius: 4px; font-weight: 600; }
+.signedOut .avatar, .checking .avatar { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--muted); }
+.acct.sel .avatar { box-shadow: inset 0 0 0 1px var(--link); }
+.avatar.two { font-size: 8px; letter-spacing: -0.3px; }
+.owner.two { width: auto; min-width: 14px; padding: 0 3px; font-size: 8px; }
+
+/* Bigger click target for Switch without changing how it looks */
+.acct .pill { position: relative; }
+.acct .pill::before { content: ''; position: absolute; inset: -4px -2px; }
+
+/* The list lines up exactly with the search box above it */
+#session-list { margin: 0; padding: 0 0 4px; }
+#session-list .folder-head { width: 100%; margin: 6px 0 0; padding: 4px 8px; }
+#session-list .proj, #session-list .sess { margin: 0; padding: 0 8px; }
+
+/* Header row: Account | 5h | Week | Use */
+.acct-head .name { grid-column: 2; text-align: left; }
+.acct-head .first { grid-column: 3; }
+.acct-head .use { grid-column: 5; text-align: right; }
+.acct-head span:nth-child(3) { grid-column: 4; }
+
+/* Header aligned to what is under it: names left, numbers right, the Use column starts where its buttons start. */
+.acct-side { justify-content: flex-start; }
+.acct-side > .pill, .acct-side > .badge { width: 100%; justify-content: center; text-align: center; box-sizing: border-box; }
+.acct-side > .link, .acct-side > .muted { white-space: nowrap; }
+.acct-head .use { text-align: left; }
+.acct-head { height: 20px; margin-bottom: 2px; border-bottom: 1px solid var(--line); opacity: 1; }
+.acct-head span { opacity: 0.85; padding-bottom: 3px; }
+
+/* Final header: Account starts at the picture's edge; 5h, Week and Use are centered over their columns. */
+.acct-head .name { grid-column: 1 / 3; text-align: left; }
+.acct-head .first, .acct-head span:nth-child(3), .acct-head .use { text-align: center; }
+.acct-col { text-align: center; }
+.acct-side { justify-content: center; }
+
+/* A quiet invitation to rate: one line, never a popup */
+.rate { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; padding: 6px 8px; border-radius: 4px; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--fg) 4%, transparent); }
+.rate[hidden] { display: none; }
+.rate-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rate-stars { flex: none; letter-spacing: 1px; font-size: 13px; color: color-mix(in srgb, var(--warn) 60%, var(--muted)); border-radius: 3px; padding: 0 2px; }
+.rate-stars:hover { color: var(--warn); background: var(--hover); }
+
+.meter.idle { opacity: 0.55; }

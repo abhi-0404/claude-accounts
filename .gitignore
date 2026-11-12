@@ -1,0 +1,4 @@
+node_modules/
+scripts/capture/out/
+scripts/capture/smoke.png
+*.vsix

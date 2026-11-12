@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/media/panel.css">
+<script src="/state.js"></script>
+<script>
+// A stand-in for the extension host: answers the panel's messages the way the real one does.
+let selected = 'Work';
+let active = 'Work';
+let checking = false;
+let bump = 0;
+let period = '7d';
+const labelOf = (k) => window.DEMO_KEYS[k] || selected;
+function current() {
+  const s = JSON.parse(JSON.stringify(window.DEMO_STATES[selected + '|' + active]));
+  s.period = period;
+  for (const g of s.groups) for (const a of g.accounts) {
+    if (a.label === selected && checking) a.live = { checking: true, checkedAt: 0, error: null };
+    if (bump && a.label === selected) a.usage.fetchedAt = Date.now() - 2000;
+  }
+  return s;
+}
+const push = () => window.postMessage({ type: 'state', state: current() }, '*');
+window.sent = [];
+let saved = null;
+window.acquireVsCodeApi = () => ({
+  postMessage: (m) => {
+    window.sent.push(m);
+    switch (m.type) {
+      case 'ready': return push();
+      case 'select': selected = labelOf(m.key); return push();
+      case 'switch': active = labelOf(m.key); selected = active; push(); return parent.postMessage({ demo: 'switched', label: active }, '*');
+      case 'refreshUsage': checking = true; push(); return setTimeout(() => { checking = false; bump = 1; push(); }, 1100);
+      case 'period': period = m.period; return push();
+      case 'newSession': return parent.postMessage({ demo: 'newSession', label: labelOf(m.key) }, '*');
+      case 'openSession': return parent.postMessage({ demo: 'openChat', id: m.id }, '*');
+      default: return undefined;
+    }
+  },
+  getState: () => saved,
+  setState: (s) => { saved = s; },
+});
+window.addEventListener('load', () => push());
+</script></head>
+<body class="vscode-dark"><script src="/media/panel.js"></script></body></html>

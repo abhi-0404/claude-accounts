@@ -1,0 +1,8 @@
+test/**
+.vscodeignore
+*.vsix
+relay/**
+docs/**
+scripts/**
+.github/**
+.gitignore

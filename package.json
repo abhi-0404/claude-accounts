@@ -1,0 +1,365 @@
+{
+  "name": "claude-accounts",
+  "displayName": "Claude Accounts",
+  "description": "Use several Claude Code accounts in VS Code. Chat in your own tab, watch each account's 5-hour and weekly usage live, switch accounts in one click, and find every chat and project in one panel.",
+  "version": "0.15.0",
+  "publisher": "abhi-0404",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudeAccounts",
+          "title": "Claude Accounts",
+          "icon": "resources/accounts.svg"
+        }
+      ]
+    },
+    "views": {
+      "claudeAccounts": [
+        {
+          "type": "webview",
+          "id": "claudeAccounts.panel",
+          "name": "Accounts"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeAccounts.switch",
+        "title": "Switch to This Account",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.pick",
+        "title": "Switch Claude Account",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.refresh",
+        "title": "Refresh Everything",
+        "category": "Claude Accounts",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "claudeAccounts.add",
+        "title": "Add Account",
+        "category": "Claude Accounts",
+        "icon": "$(add)"
+      },
+      {
+        "command": "claudeAccounts.signIn",
+        "title": "Sign In",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.remove",
+        "title": "Remove Account From List",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.newSession",
+        "title": "New Session With This Account",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.openSession",
+        "title": "Open Chat",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.resumeInTerminal",
+        "title": "Continue Chat in Terminal",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.copySessionId",
+        "title": "Copy Chat ID",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.searchSessions",
+        "title": "Search Chats in All Accounts",
+        "category": "Claude Accounts",
+        "icon": "$(search)"
+      },
+      {
+        "command": "claudeAccounts.openUsagePage",
+        "title": "Open Usage Page on claude.ai",
+        "category": "Claude Accounts",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "claudeAccounts.refreshUsage",
+        "title": "Refresh Usage",
+        "category": "Claude Accounts",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "claudeAccounts.toggleLiveUsage",
+        "title": "Turn Live Usage On or Off",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.deleteSession",
+        "title": "Delete Chat",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.signOut",
+        "title": "Sign Out",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.openChat",
+        "title": "New Session",
+        "category": "Claude Accounts",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "claudeAccounts.rate",
+        "title": "Rate Claude Accounts",
+        "category": "Claude Accounts"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeAccounts.openChat",
+          "when": "view == claudeAccounts.panel",
+          "group": "navigation@0"
+        },
+        {
+          "command": "claudeAccounts.add",
+          "when": "view == claudeAccounts.panel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "claudeAccounts.searchSessions",
+          "when": "view == claudeAccounts.panel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "claudeAccounts.refresh",
+          "when": "view == claudeAccounts.panel",
+          "group": "1_more@1"
+        },
+        {
+          "command": "claudeAccounts.openUsagePage",
+          "when": "view == claudeAccounts.panel",
+          "group": "1_more@2"
+        },
+        {
+          "command": "claudeAccounts.toggleLiveUsage",
+          "when": "view == claudeAccounts.panel",
+          "group": "1_more@3"
+        },
+        {
+          "command": "claudeAccounts.rate",
+          "when": "view == claudeAccounts.panel",
+          "group": "1_more@4"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "claudeAccounts.switch",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'account' && !isActive && signedIn",
+          "group": "1_use@1"
+        },
+        {
+          "command": "claudeAccounts.newSession",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'account' && signedIn",
+          "group": "1_use@2"
+        },
+        {
+          "command": "claudeAccounts.openUsagePage",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'account' && signedIn",
+          "group": "2_info@1"
+        },
+        {
+          "command": "claudeAccounts.signIn",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'account' && !signedIn",
+          "group": "3_login@1"
+        },
+        {
+          "command": "claudeAccounts.signOut",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'account' && signedIn",
+          "group": "3_login@1"
+        },
+        {
+          "command": "claudeAccounts.remove",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'account' && !isActive",
+          "group": "4_manage@1"
+        },
+        {
+          "command": "claudeAccounts.openSession",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'session'",
+          "group": "1_main@1"
+        },
+        {
+          "command": "claudeAccounts.resumeInTerminal",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'session'",
+          "group": "1_main@2"
+        },
+        {
+          "command": "claudeAccounts.copySessionId",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'session'",
+          "group": "2_copy@1"
+        },
+        {
+          "command": "claudeAccounts.deleteSession",
+          "when": "webviewId == 'claudeAccounts.panel' && webviewSection == 'session'",
+          "group": "3_delete@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "claudeAccounts.switch",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.signIn",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.remove",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.newSession",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.openSession",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.resumeInTerminal",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.copySessionId",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.deleteSession",
+          "when": "false"
+        },
+        {
+          "command": "claudeAccounts.signOut",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Accounts",
+      "properties": {
+        "claudeAccounts.accounts": {
+          "type": "array",
+          "scope": "application",
+          "description": "Your Claude accounts, in the order shown in the panel. Each has a name and a login folder. An empty login folder means the default one (~/.claude). Usually managed from the panel.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Name shown in the list"
+              },
+              "configDir": {
+                "type": "string",
+                "description": "Login folder (CLAUDE_CONFIG_DIR); empty for the default folder"
+              }
+            },
+            "required": [
+              "label",
+              "configDir"
+            ]
+          },
+          "default": []
+        },
+        "claudeAccounts.claudePath": {
+          "type": "string",
+          "scope": "machine",
+          "default": "claude",
+          "description": "The Claude Code command to run. \"claude\" uses the one on your PATH, or the copy inside the Claude Code extension."
+        },
+        "claudeAccounts.liveUsage": {
+          "type": "boolean",
+          "scope": "application",
+          "default": true,
+          "description": "Windows only. Update usage after every Claude reply, using a small helper that reads only the usage line Claude sends. It never replaces a helper you set yourself."
+        },
+        "claudeAccounts.homeDir": {
+          "type": "string",
+          "scope": "application",
+          "default": "",
+          "description": "Optional. A folder every account shares for projects, chats, memory, skills and rules, so switching accounts keeps your full context. Leave empty to keep each account separate."
+        },
+        "claudeAccounts.openChatsIn": {
+          "type": "string",
+          "scope": "application",
+          "enum": [
+            "tab",
+            "claudeCode"
+          ],
+          "default": "tab",
+          "enumDescriptions": [
+            "Open chats in the Claude Accounts chat tab.",
+            "Open chats in the Claude Code extension."
+          ],
+          "description": "Where chats from the panel open: this extension's own chat tab, or the Claude Code extension (only if it is installed)."
+        },
+        "claudeAccounts.autoRefresh": {
+          "type": "boolean",
+          "scope": "application",
+          "default": true,
+          "description": "Keep usage up to date by checking with Claude every few minutes while the panel is open and the window is focused."
+        },
+        "claudeAccounts.weeklyReminders": {
+          "type": "boolean",
+          "scope": "application",
+          "default": true,
+          "description": "Show a reminder when an account is likely to leave a good part of its weekly limit unused."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "vscode:uninstall": "node ./uninstall.js"
+  },
+  "keywords": [
+    "claude",
+    "claude code",
+    "anthropic",
+    "accounts",
+    "usage",
+    "rate limit",
+    "switch account"
+  ],
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#1f1e1d",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/abhi-0404/claude-accounts.git"
+  },
+  "homepage": "https://github.com/abhi-0404/claude-accounts#readme",
+  "bugs": {
+    "url": "https://github.com/abhi-0404/claude-accounts/issues"
+  },
+  "qna": "marketplace"
+}
