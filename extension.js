@@ -21,6 +21,8 @@ const PENDING_TTL = 3 * 60 * 1000;
 const CLAUDE_OPEN = 'claude-vscode.editor.open';
 const USAGE_URL = 'https://claude.ai/settings/usage';
 const rating = require('./rating');
+const autostart = require('./autostart');
+const remind = require('./remind');
 
 const statusCache = new Map(); // account key -> claude auth status
 const planCache = new Map(); // account key -> plan usage
@@ -34,6 +36,8 @@ let relayState = 'starting'; // on | off | foreign (another wrapper is set) | fa
 let ctx;
 let view;
 let statusBar;
+let autoBar; // shows scheduled auto-starts
+let simulation = null; // { key, at, until } while a test alert is on
 let periodId = '7d';
 let selectedKey = '';
 
@@ -174,6 +178,123 @@ function panelHtml(webview) {
 </html>`;
 }
 
+// ---------- Auto-start of a session window (one tiny message, then the schedule removes itself) ----------
+
+let autoTimer;
+const autoList = () => autostart.normalize(ctx.globalState.get('autoStarts') || []); // older builds could hold a window twice
+const saveAuto = (list) => ctx.globalState.update('autoStarts', list);
+const clock = (ms) => new Date(Math.round(ms / 60000) * 60000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+/** A status bar entry that shows while any auto-start is set: the next time, with all of them in the hover. */
+function updateAutoBar() {
+  if (!autoBar) return;
+  const list = autoList();
+  if (!list.length) return autoBar.hide();
+  const when = (ms) => new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  autoBar.text = `$(clock) ${clock(list[0].start)}${list.length > 1 ? ` +${list.length - 1}` : ''}`;
+  autoBar.tooltip = ['Auto-start set (one tiny message starts the session window)', ...list.map((x) => `${(findAccount(x.key) || { label: 'Account' }).label}: ${when(x.start)}`), 'Click to see or cancel'].join('\n');
+  autoBar.show();
+}
+
+async function manageAutoStarts() {
+  const list = autoList();
+  if (!list.length) return vscode.window.showInformationMessage('No auto-starts are set. Click a session window in the Usage section to add one.');
+  const items = list.map((x) => ({
+    label: `$(clock) ${(findAccount(x.key) || { label: 'Account' }).label}`,
+    description: new Date(x.start).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }),
+    detail: 'Pick to cancel this auto-start.',
+    item: x,
+  }));
+  const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Scheduled auto-starts. Pick one to cancel it.' });
+  if (!pick) return undefined;
+  await saveAuto(autostart.remove(autoList(), pick.item));
+  armAutoStarts();
+  post();
+  return vscode.window.setStatusBarMessage('$(check) Auto-start cancelled.', 4000);
+}
+
+/** For testing: a real auto-start one minute from now for the selected account. */
+async function testAutoStart() {
+  const account = selectedAccount();
+  if (!account) return undefined;
+  const r = autostart.add(autoList(), { key: key(account), start: Date.now() + 15 * 1000 });
+  await saveAuto(r.list);
+  armAutoStarts();
+  post();
+  return vscode.window.showInformationMessage(`Auto-start test set for ${account.label} in about a minute. If no session window is running then, one tiny message is sent. Watch the clock in the status bar.`);
+}
+
+/** For testing: shows a made-up weekly alert for the selected account for 15 minutes (or stops it). */
+async function simulateAlert() {
+  const account = selectedAccount();
+  if (!account) return undefined;
+  if (simulation) {
+    simulation = null;
+    post();
+    return vscode.window.showInformationMessage('The test alert is off.');
+  }
+  simulation = { key: key(account), at: Date.now(), until: Date.now() + 15 * 60 * 1000 };
+  post(); // draws the bell and card, and shows the notification
+  return vscode.window.showInformationMessage(`Test alert on for ${account.label} for 15 minutes. Open the Claude Accounts panel to see the bell and the session windows. Run this command again to turn it off.`);
+}
+
+/** Wakes up at the next schedule (the one-minute tick is the safety net). */
+function armAutoStarts() {
+  clearTimeout(autoTimer);
+  updateAutoBar();
+  const next = autostart.next(autoList());
+  if (next) autoTimer = setTimeout(() => runAutoStarts().catch((e) => log.warn(`auto-start: ${e.message}`)), Math.min(next.start + autostart.FIRE_DELAY_MS - Date.now() + 500, 2 ** 31 - 1));
+}
+
+async function runAutoStarts() {
+  let list = autoList();
+  for (const item of autostart.missed(list)) {
+    const account = findAccount(item.key);
+    vscode.window.showInformationMessage(`The auto-start for ${account ? account.label : 'an account'} at ${clock(item.start)} was skipped because VS Code was not open then.`);
+    list = autostart.remove(list, item);
+  }
+  for (const item of autostart.due(list)) {
+    list = autostart.remove(list, item); // one-shot: gone whether it runs or not
+    await saveAuto(list);
+    // Every open window runs this; only the first one to claim it sends the message.
+    if (!autostart.claim(path.join(ctx.globalStorageUri.fsPath, 'locks'), item)) {
+      log.info('auto-start left to another window');
+      continue;
+    }
+    await sendAutoStart(item);
+  }
+  await saveAuto(list);
+  armAutoStarts();
+  post();
+}
+
+/** The tiny message: the cheapest model, no chat saved. Skipped when a window is already running. */
+function sendAutoStart(item) {
+  const account = findAccount(item.key);
+  if (!account) return Promise.resolve();
+  const why = autostart.skipReason(planCache.get(item.key), signedIn(account));
+  if (why) {
+    vscode.window.setStatusBarMessage(`$(clock) Auto-start skipped for ${account.label}: ${why}.`, 8000);
+    return Promise.resolve();
+  }
+  const env = { ...process.env };
+  delete env[lib.ENV_KEY];
+  if (account.configDir) env[lib.ENV_KEY] = account.configDir;
+  return new Promise((resolve) => {
+    execFile(claudeCommand(), autostart.messageArgs(), { env, timeout: 90000, windowsHide: true }, (err) => {
+      if (err) {
+        log.warn(`auto-start for ${account.label} failed: ${err.message}`);
+        vscode.window.showWarningMessage(`The auto-start for ${account.label} could not run: ${err.message}`);
+      } else {
+        log.info(`auto-start sent for ${account.label}`);
+        vscode.window.setStatusBarMessage(`$(check) Auto-start: the next 5-hour window of ${account.label} has begun.`, 10000);
+        for (const d of autostart.CONFIRM_DELAYS_MS) setTimeout(() => checkUsage(account), d); // the new window appears after a short delay
+      }
+      resolve();
+    });
+  });
+}
+
 // ---------- Asking for a rating, gently ----------
 
 const ratingState = () => ({ ...rating.empty(), ...(ctx.globalState.get('rating') || {}) });
@@ -214,7 +335,7 @@ async function rateNow() {
 function currentState() {
   const weekly = weeklyInfo();
   notifyWeeklyAlerts(weekly);
-  return { ...currentStateBase(weekly), rate: rating.shouldHint(ratingState()) };
+  return { ...currentStateBase(weekly), rate: rating.shouldHint(ratingState()), autoStarts: autoList().map(({ key: k, start }) => ({ key: k, start })) };
 }
 
 function currentStateBase(weekly) {
@@ -306,6 +427,16 @@ function saveHistorySoon() {
 }
 
 /** Weekly plan for every account: this/last week's 5-hour slots, the learned session share and any alert. */
+/** The account's real alert, or a made-up one while a test (Simulate Weekly Alert) is running for it. */
+function alertFor(k, plan, share, pace) {
+  if (simulation && Date.now() > simulation.until) simulation = null;
+  if (simulation && simulation.key === k) {
+    const demo = history.weeklyAlert(history.demoPlan(simulation.at), 0.12, Date.now(), { sessionsPerDay: 1.2, avgUse: 30, learned: true });
+    if (demo) return { ...demo, simulated: true };
+  }
+  return history.weeklyAlert(plan, share, Date.now(), pace);
+}
+
 function weeklyInfo() {
   const info = new Map();
   const pace = history.pattern(usageHistory); // your usual pace, learned across all accounts
@@ -321,35 +452,45 @@ function weeklyInfo() {
       summary: history.weekSummary(usageHistory, k, weeklyReset),
       share,
       perSession: Math.round((share || history.DEFAULT_SHARE) * 1000) / 10,
-      alert: signedIn(a) ? history.weeklyAlert(plan, share, Date.now(), pace) : null,
+      alert: signedIn(a) ? alertFor(k, plan, share, pace) : null,
     });
   }
   return info;
 }
 
-/** One VS Code notification per account, weekly reset and alert level. */
+/**
+ * The weekly reminder as a VS Code notification, rarely (see remind.js): at most a reminder and one
+ * final alert per account and week, never while you are using that account, never within hours of
+ * another, and only from one window. The card in the panel always shows the advice anyway.
+ */
 function notifyWeeklyAlerts(info) {
   if (!cfg().get('weeklyReminders', true)) return;
-  const seen = ctx.globalState.get('weeklyAlertsShown', {});
-  let changed = false;
+  let state = ctx.globalState.get('reminders') || remind.empty();
   for (const a of accounts()) {
     const alert = info.get(key(a)) && info.get(key(a)).alert;
     if (!alert) continue;
-    const id = `${key(a)}|${alert.resetsAt}|${alert.level}`;
-    if (seen[id]) continue;
-    seen[id] = Date.now();
-    changed = true;
+    const d = remind.decide(state, key(a), alert, Date.now(), { focused: vscode.window.state.focused, inSession: Boolean(alert.inSession) });
+    if (!d.notify) continue;
+    state = d.state;
+    ctx.globalState.update('reminders', state);
+    // Every open window gets here: only the first one to claim it shows the notification.
+    const lock = { key: `notify-${key(a)}-${alert.level}${alert.simulated ? '-test' : ''}`, start: d.cycle };
+    if (!alert.simulated && !autostart.claim(path.join(ctx.globalStorageUri.fsPath, 'locks'), lock)) continue;
     const when = new Date(alert.resetsAt).toLocaleString([], { weekday: 'short', hour: 'numeric' });
-    const msg = alert.level === 'final'
+    const test = alert.simulated ? 'Test: ' : '';
+    const msg = test + (alert.level === 'final'
       ? `${a.label} has ${alert.unused}% of this week's limit left and it resets ${when}. ${alert.maxReach < 100 ? `Even with every session used, only ${alert.maxReach}% can be reached.` : 'Use every remaining session to make the most of it.'}`
-      : `${a.label} is on pace to use ${alert.projected}% of this week's limit. ${alert.unused}% is left until it resets ${when}.`;
+      : `${a.label} is on pace to use ${alert.projected}% of this week's limit. ${alert.unused}% is left until it resets ${when}.`);
     const show = alert.level === 'final' ? vscode.window.showWarningMessage : vscode.window.showInformationMessage;
-    show(msg, 'Start Session').then((pick) => pick && newSession(a));
-  }
-  if (changed) {
-    const cutoff = Date.now() - 21 * 24 * 3600 * 1000;
-    for (const id of Object.keys(seen)) if (seen[id] < cutoff) delete seen[id];
-    ctx.globalState.update('weeklyAlertsShown', seen);
+    show(msg, 'Start Session', 'Mute Reminders').then(async (pick) => {
+      if (pick === 'Start Session') return newSession(a);
+      if (pick === 'Mute Reminders') {
+        await cfg().update('weeklyReminders', false, vscode.ConfigurationTarget.Global);
+        vscode.window.setStatusBarMessage('$(bell-slash) Weekly reminders are off. Turn them back on with the setting claudeAccounts.weeklyReminders.', 8000);
+      }
+      return undefined;
+    });
+    break; // one notification at a time
   }
 }
 
@@ -592,7 +733,7 @@ async function checkUsage(account) {
     const livePlan = live.planFromLive(answer);
     if (!livePlan) throw new Error('Claude has no usage numbers right now');
     const saved = await lib.readPlanUsage(account.configDir);
-    offerPlan(k, live.mergePlans(livePlan, saved, planCache.get(k)));
+    offerPlan(k, live.acceptLive(planCache.get(k), live.mergePlans(livePlan, saved, planCache.get(k))));
     liveInfo.set(k, { checking: false, checkedAt: Date.now(), error: null });
   } catch (e) {
     log.warn(`usage check for ${account.label} failed: ${e.message}`);
@@ -601,24 +742,35 @@ async function checkUsage(account) {
   post();
 }
 
-const AUTO_MIN_MS = 2 * 60 * 1000; // never ask more often than this (the usage server is rate limited)
-const AUTO_STALE_MS = 5 * 60 * 1000; // while the panel is open, re-ask when the numbers are older than this
-const AUTO_RETRY_MS = 5 * 60 * 1000; // after a failed check
+const AUTO_RETRY_MS = 5 * 60 * 1000; // after a failed check, wait this long
+const AUTO_FRESH_MS = 10 * 1000; // numbers a reply just updated need no check
+
+/** Seconds between automatic checks (setting claudeAccounts.refreshSeconds, 15 to 600, default 30). */
+const refreshMs = () => Math.min(600, Math.max(15, Number(cfg().get('refreshSeconds', 30)) || 30)) * 1000;
 
 /**
- * Keeps the numbers fresh without a click: asks Claude for the account's usage when the panel is
- * showing, the window is focused and the numbers are not already fresh from a reply. "soon" is for
- * moments the user just looked (picking an account, coming back to the window).
+ * Keeps the numbers fresh without a click: while the panel is showing and the window is focused, asks
+ * Claude for the account's usage every refreshSeconds (30 by default), unless a reply just updated it.
+ * "soon" is for moments the user just looked (picking an account, coming back to the window): it uses
+ * the shorter of the interval and 15 seconds. A failed check waits 5 minutes.
  */
 function autoRefresh(account, soon) {
   if (!account || !cfg().get('autoRefresh', true) || !view || !view.visible || !vscode.window.state.focused || !signedIn(account)) return;
   const k = key(account);
   const info = liveInfo.get(k) || {};
   const plan = planCache.get(k);
-  if (Date.now() - ((plan && plan.fetchedAt) || 0) < AUTO_MIN_MS) return; // a reply just updated it
-  const wait = info.error ? AUTO_RETRY_MS : soon ? AUTO_MIN_MS : AUTO_STALE_MS;
+  if (Date.now() - ((plan && plan.fetchedAt) || 0) < AUTO_FRESH_MS) return; // a reply just updated it
+  const wait = info.error ? AUTO_RETRY_MS : soon ? Math.min(refreshMs(), 15000) : refreshMs();
   if (Date.now() - (info.checkedAt || 0) < wait) return;
   checkUsage(account);
+}
+
+/** The account the panel shows and the one in use (the status bar shows it): both stay fresh. */
+function autoRefreshVisible(soon) {
+  const shown = selectedAccount();
+  autoRefresh(shown, soon);
+  const used = accounts().find(isActive);
+  if (used && used !== shown) autoRefresh(used, soon);
 }
 
 /** Finds where each chat's folder is now (it may have moved since the chat started). Once per folder. */
@@ -654,7 +806,7 @@ const panelProvider = {
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible) {
         post();
-        autoRefresh(selectedAccount(), true);
+        autoRefreshVisible(true);
       }
     });
     webviewView.onDidDispose(() => {
@@ -678,7 +830,7 @@ async function onMessage(msg) {
       return checkUsage(account);
     case 'activity':
       // Any use of the panel counts as "looking": refresh if the numbers are due (rate limited inside).
-      return autoRefresh(selectedAccount(), true);
+      return autoRefreshVisible(true);
     case 'period':
       periodId = msg.period;
       await ctx.globalState.update('period', periodId);
@@ -712,6 +864,20 @@ async function onMessage(msg) {
       return addAccount(msg.group);
     case 'openUsage':
       return vscode.env.openExternal(vscode.Uri.parse(USAGE_URL));
+    case 'autoStart': {
+      if (!account) return undefined;
+      let list = autoList();
+      if (msg.on) {
+        const r = autostart.add(list, { key: key(account), start: Number(msg.start) });
+        list = r.list;
+        if (r.error) vscode.window.showWarningMessage(`That window cannot be scheduled: ${{ past: 'its start time has passed', 'too far ahead': 'it is too far ahead', 'too many': 'there are already too many scheduled' }[r.error] || r.error}.`);
+      } else {
+        list = autostart.remove(list, { key: key(account), start: Number(msg.start) });
+      }
+      await saveAuto(list);
+      armAutoStarts();
+      return post();
+    }
     case 'rate':
       return rateNow();
     case 'hideRate':
@@ -748,6 +914,46 @@ async function load(account, parts) {
 }
 
 /** Reads chats and model usage from the real history folder, one read at a time per folder. */
+/**
+ * Keeps what each finished 5-hour session used: replies and tokens per model, read from the chat
+ * transcripts and stored with the session in the usage history (kept for three years). Together with the
+ * session peaks and weekly samples this is the data for learning how you use your limits. Sessions are
+ * matched by time, so with accounts used at the same moment a session can include the other's replies.
+ */
+let archivedAt = 0;
+async function archiveModels(account) {
+  if (Date.now() - archivedAt < 10 * 60 * 1000) return;
+  archivedAt = Date.now();
+  const closed = Date.now() - 10 * 60 * 1000;
+  const sharing = accounts().filter((a) => histKey(a) === histKey(account));
+  const pending = [];
+  for (const a of sharing) {
+    const acc = usageHistory.accounts[key(a)];
+    if (!acc) continue;
+    for (const w of Object.values(acc.windows)) if (w.models === undefined && w.end < closed) pending.push(w);
+  }
+  if (!pending.length) return;
+  const records = await lib.readReplyRecords(lib.historyDir(account.configDir), Math.min(...pending.map((w) => w.start)));
+  for (const w of pending) w.models = history.modelMix(records, w.start, w.end, lib.modelName);
+  saveHistorySoon();
+}
+
+/** Saves every recorded session (and what it used) as JSON or CSV, for your own analysis. */
+async function exportUsage() {
+  const labels = Object.fromEntries(accounts().map((a) => [key(a), a.label]));
+  const rows = history.exportRows(usageHistory, labels);
+  if (!rows.length) return vscode.window.showInformationMessage('No sessions are recorded yet. They appear as you use Claude with the panel open.');
+  const target = await vscode.window.showSaveDialog({
+    defaultUri: vscode.Uri.file(path.join(os.homedir(), 'claude-usage-history.json')),
+    filters: { JSON: ['json'], CSV: ['csv'] },
+    saveLabel: 'Export Usage History',
+  });
+  if (!target) return undefined;
+  const text = /\.csv$/i.test(target.fsPath) ? history.toCsv(rows) : JSON.stringify(rows, null, 2);
+  await vscode.workspace.fs.writeFile(target, Buffer.from(text, 'utf8'));
+  return vscode.window.showInformationMessage(`Exported ${rows.length} sessions to ${path.basename(target.fsPath)}.`);
+}
+
 async function loadHistory(account) {
   const hk = histKey(account);
   const run = historyRuns.get(hk);
@@ -767,6 +973,7 @@ async function loadHistory(account) {
         resolveFolders(chats.value); // runs in the background; the panel redraws when names are found
       }
       if (models.status === 'fulfilled') modelsCache.set(hk, models.value);
+      archiveModels(account).catch((e) => log.warn(`usage archive: ${e.message}`));
       if (state.again) post();
     } while (state.again);
   } finally {
@@ -1285,6 +1492,8 @@ function activate(context) {
   selectedKey = context.globalState.get('selected', '') || lib.normalizeDir(activeDir());
   statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusBar.command = 'claudeAccounts.pick';
+  autoBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  autoBar.command = 'claudeAccounts.autoStarts';
 
   chat.init({
     ctx: context,
@@ -1308,22 +1517,27 @@ function activate(context) {
     // Every minute: re-read Claude's saved usage and chats (above), apply any reset, redraw.
     handleResets();
     post();
-    autoRefresh(selectedAccount());
+    autoRefreshVisible();
+    if (autostart.due(autoList()).length || autostart.missed(autoList()).length) runAutoStarts().catch(() => {});
+    else armAutoStarts();
   }, TICK_MS);
+  const refreshTick = setInterval(() => autoRefreshVisible(), 10 * 1000); // checks the interval, so the cadence is refreshSeconds
   const statusTick = setInterval(() => accounts().forEach((a) => schedule(a, 'status')), STATUS_MS);
   const reg = (id, fn) => vscode.commands.registerCommand(id, fn);
 
   context.subscriptions.push(
     statusBar,
+    autoBar,
     {
       dispose: () => {
         clearInterval(tick);
         clearInterval(statusTick);
+        clearInterval(refreshTick);
         clearTimeout(resetTimer);
         watchers.forEach((w) => w.close());
       },
     },
-    vscode.window.onDidChangeWindowState((w) => w.focused && autoRefresh(selectedAccount(), true)),
+    vscode.window.onDidChangeWindowState((w) => w.focused && autoRefreshVisible(true)),
     vscode.window.registerWebviewViewProvider(VIEW_ID, panelProvider, { webviewOptions: { retainContextWhenHidden: true } }),
     reg('claudeAccounts.refreshUsage', () => checkUsage(selectedAccount())),
     reg('claudeAccounts.switch', switchTo),
@@ -1338,6 +1552,10 @@ function activate(context) {
     reg('claudeAccounts.copySessionId', (arg) => arg && arg.sessionId && vscode.env.clipboard.writeText(arg.sessionId)),
     reg('claudeAccounts.searchSessions', searchAllChats),
     reg('claudeAccounts.rate', rateNow),
+    reg('claudeAccounts.exportUsage', exportUsage),
+    reg('claudeAccounts.autoStarts', manageAutoStarts),
+    reg('claudeAccounts.testAutoStart', testAutoStart),
+    reg('claudeAccounts.simulateAlert', simulateAlert),
     reg('claudeAccounts.openUsagePage', () => vscode.env.openExternal(vscode.Uri.parse(USAGE_URL))),
     reg('claudeAccounts.refresh', () => {
       loadAll();
@@ -1376,6 +1594,7 @@ function activate(context) {
   loadAll();
   setupRelay();
   setTimeout(() => openPending(), 1500);
+  setTimeout(() => runAutoStarts().catch(() => {}), 4000); // missed or due schedules from before a restart
 }
 
 function deactivate() {}

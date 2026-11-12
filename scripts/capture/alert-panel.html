@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/media/panel.css">
+<script src="/state.js"></script>
+<script>
+// A stand-in for the extension host that also plays the weekly alert and the auto-start scheduler,
+// the way extension.js does, so they can be tried in a browser.
+let selected = 'Personal';
+let active = 'Work';
+let alertOn = false;
+let windowRunning = false; // "a session window is already running" for the skip rule
+let autos = []; // [{ key, start }]
+let timers = [];
+const keyOf = (label) => Object.keys(window.DEMO_KEYS).find((k) => window.DEMO_KEYS[k] === label);
+const labelOf = (k) => window.DEMO_KEYS[k] || selected;
+const SAME = 5 * 60 * 1000;
+const near = (a, b) => a.key === b.key && Math.abs(a.start - b.start) <= SAME;
+const tell = (m) => parent.postMessage({ sim: true, ...m }, '*');
+const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+function current() {
+  const s = JSON.parse(JSON.stringify(window.DEMO_STATES[selected + '|' + active]));
+  for (const g of s.groups) for (const a of g.accounts) a.weekly = a.weekly ? { ...a.weekly, alert: null } : a.weekly;
+  if (alertOn) {
+    for (const g of s.groups) for (const a of g.accounts) if (a.label === selected && a.weekly) a.weekly.alert = window.DEMO_ALERTS[selected];
+  }
+  s.autoStarts = autos.map((x) => ({ ...x }));
+  s.rate = false;
+  return s;
+}
+const push = () => window.postMessage({ type: 'state', state: current() }, '*');
+const report = () => tell({ kind: 'autos', list: autos.map((x) => ({ ...x, label: labelOf(x.key) })) });
+
+function arm() {
+  timers.forEach(clearTimeout);
+  timers = autos.map((x) => setTimeout(() => fire(x), Math.max(0, x.start - Date.now())));
+  report();
+}
+
+function fire(item) {
+  autos = autos.filter((x) => !near(x, item)); // one-shot: gone whether it runs or not
+  const label = labelOf(item.key);
+  if (windowRunning) tell({ kind: 'status', text: `Auto-start skipped for ${label}: a session window is already running.` });
+  else tell({ kind: 'status', ok: true, text: `Auto-start: the next 5-hour window of ${label} has begun.` });
+  arm();
+  push();
+}
+
+function setAlert(on) {
+  alertOn = on;
+  if (on) {
+    const al = window.DEMO_ALERTS[selected];
+    const when = new Date(al.resetsAt).toLocaleString([], { weekday: 'short', hour: 'numeric' });
+    const text = al.level === 'final'
+      ? `Test: ${selected} has ${al.unused}% of this week's limit left and it resets ${when}. ${al.maxReach < 100 ? `Even with every session used, only ${al.maxReach}% can be reached.` : 'Use every remaining session to make the most of it.'}`
+      : `Test: ${selected} is on pace to use ${al.projected}% of this week's limit. ${al.unused}% is left until it resets ${when}.`;
+    tell({ kind: 'notify', text, level: al.level });
+  }
+  push();
+}
+
+window.addEventListener('message', (e) => {
+  const m = e.data || {};
+  if (m.demoCmd === 'alert') setAlert(Boolean(m.on));
+  if (m.demoCmd === 'running') windowRunning = Boolean(m.on);
+  if (m.demoCmd === 'testAuto') {
+    autos = [...autos.filter((x) => !near(x, { key: keyOf(selected), start: Date.now() + 60000 })), { key: keyOf(selected), start: Date.now() + 60000 }];
+    arm();
+    push();
+    tell({ kind: 'notify', text: `Auto-start test set for ${selected} in one minute. If no session window is running then, one tiny message is sent. Watch the clock in the status bar.` });
+  }
+  if (m.demoCmd === 'cancel') {
+    autos = autos.filter((x) => !near(x, m));
+    arm();
+    push();
+  }
+  if (m.demoCmd === 'fireNow' && autos[0]) fire(autos[0]);
+  if (m.demoCmd === 'slots') {
+    // Make the alert have n session windows until the weekly reset, to see how the card copes.
+    const H = 3600e3;
+    const now = Date.now();
+    const al = window.DEMO_ALERTS[selected];
+    const first = Math.round((now + 2 * H) / 60000) * 60000;
+    const slots = [{ start: now, end: first, current: true, left: 40, aim: al.aim, gain: 3 }];
+    for (let k = 0; k < m.n - 1; k += 1) {
+      const start = first + k * 5 * H;
+      const last = k === m.n - 2;
+      slots.push({ start, end: start + (last ? 3 * H : 5 * H), aim: al.aim, gain: 9.6, partial: last });
+    }
+    al.slots = slots;
+    al.resetsAt = new Date(slots[slots.length - 1].end).toISOString();
+    alertOn = true;
+    push();
+  }
+  if (m.demoCmd === 'select') {
+    selected = m.label;
+    push();
+  }
+});
+
+let saved = null;
+window.acquireVsCodeApi = () => ({
+  postMessage: (m) => {
+    switch (m.type) {
+      case 'ready': return push();
+      case 'select': selected = labelOf(m.key); tell({ kind: 'selected', label: selected }); return push();
+      case 'switch': active = labelOf(m.key); selected = active; tell({ kind: 'selected', label: selected }); return push();
+      case 'newSession': return tell({ kind: 'status', text: 'A new session would open in a chat tab.' });
+      case 'autoStart': {
+        const item = { key: m.key, start: Number(m.start) };
+        if (m.on) {
+          if (item.start > Date.now() && !autos.some((x) => near(x, item))) autos = [...autos, item].sort((a, b) => a.start - b.start);
+        } else {
+          autos = autos.filter((x) => !near(x, item));
+        }
+        arm();
+        return push();
+      }
+      default: return undefined;
+    }
+  },
+  getState: () => saved,
+  setState: (s) => { saved = s; },
+});
+window.addEventListener('load', () => push());
+</script></head>
+<body class="vscode-dark"><script src="/media/panel.js"></script></body></html>

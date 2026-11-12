@@ -7,7 +7,7 @@
 
   const saved = vscode.getState() || {};
   // Everything starts closed; `open` remembers what you opened. (Older saved state used `closed`.)
-  const ui = Object.assign({ open: { 'g:Accounts': true }, scope: 'folder', q: '', limit: PAGE, range: 'w1', utab: 'history', hspan: 'week', details: false, kind: 'chats', who: 'mine', fold: {} }, saved.ui || {});
+  const ui = Object.assign({ open: {}, scope: 'folder', q: '', limit: PAGE, range: 'w1', utab: 'history', hspan: 'week', details: false, kind: 'chats', who: 'mine', fold: {}, sortAccounts: 'limit' }, saved.ui || {});
   if (ui.scope === 'projects') ui.kind = 'projects'; // older saved state
   delete ui.scope;
   delete ui.closed;
@@ -25,6 +25,9 @@
     right: svg('<path d="M6 3l5 5-5 5"/>'),
     search: svg('<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/>'),
     users: svg('<circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13c0-2.4 1.9-4 4.2-4s4.2 1.6 4.2 4"/><path d="M10.5 3.5a2.2 2.2 0 010 4.3M12 9.3c1.5.4 2.5 1.7 2.5 3.7"/>'),
+    clock: svg('<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>'),
+    info: svg('<circle cx="8" cy="8" r="6"/><path d="M8 7.2v3.6M8 5v.1"/>'),
+    sort: svg('<path d="M5 3v10M2.5 10.5L5 13l2.5-2.5M11 13V3M8.5 5.5L11 3l2.5 2.5"/>'),
     bolt: svg('<path d="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z"/>'),
     terminal: svg('<rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4.5 6l2 2-2 2M8 10.5h3.5"/>'),
     copy: svg('<rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 3.5v-1h-8v8h1"/>'),
@@ -60,9 +63,12 @@
     if (secs < 60) return `${secs}s ago`;
     return `${ago(ms)} ago`;
   };
+  /** A time rounded to the nearest minute: Claude sends resets like 15:29:59.84, which is 3:30, not 3:29. */
+  const atMinute = (v) => new Date(Math.round(new Date(v).getTime() / 60000) * 60000);
+
   /** "Resets today at 11:40 PM", "Resets tomorrow at 9:00 AM", "Resets Sat, Nov 14 at 9:29 AM". */
   function resetText(iso) {
-    const d = new Date(iso);
+    const d = atMinute(iso);
     if (Number.isNaN(d.getTime())) return '';
     const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const today = new Date();
@@ -200,6 +206,28 @@
 
   // ---------- Accounts ----------
 
+  /**
+   * The accounts in the order shown: the weekly reset that comes soonest first (1d above 4d), then the
+   * one with less limit left. Accounts with no known reset (signed out, no number yet) keep your saved
+   * order after them. "manual" is your own drag-and-drop order.
+   */
+  function orderedAccounts(list) {
+    if (ui.sortAccounts === 'manual') return list;
+    const resetAt = (a) => {
+      const w = a.status === 'signedIn' && a.usage && a.usage.weekly;
+      const t = w && w.resetsAt ? Math.round(new Date(w.resetsAt).getTime() / 60000) : NaN;
+      return Number.isFinite(t) ? t : Infinity;
+    };
+    const left = (a) => (a.usage && a.usage.weekly ? 100 - Number(a.usage.weekly.percent || 0) : 100);
+    return list.map((a, i) => ({ a, i })).sort((x, y) => {
+      const rx = resetAt(x.a);
+      const ry = resetAt(y.a);
+      if (rx !== ry) return rx === Infinity ? 1 : ry === Infinity ? -1 : rx - ry;
+      if (rx === Infinity) return x.i - y.i; // no reset known: your order
+      return left(x.a) - left(y.a) || x.i - y.i;
+    }).map((x) => x.a);
+  }
+
   function renderAccounts() {
     $('#accounts').innerHTML = state.groups
       .map((g) => {
@@ -207,40 +235,71 @@
         return `<div class="group ${closed ? 'closed' : ''}">
           <div class="group-head">
             <button class="toggle" data-toggle="g:${esc(g.name)}" aria-expanded="${!closed}">${I.chev}<span class="ellipsis">${esc(g.name)}</span><span class="count">${g.accounts.length}</span></button>
+            <button class="icon-btn sort-btn ${ui.sortAccounts === 'manual' ? '' : 'on'}" data-act="sortAccounts" aria-pressed="${ui.sortAccounts !== 'manual'}" title="${ui.sortAccounts === 'manual' ? 'Your own order. Click to sort by the weekly reset, soonest first.' : 'Sorted by the weekly reset, soonest first. Click for your own order.'}" aria-label="Sort accounts by weekly reset">${I.sort}</button>
             <button class="icon-btn" data-act="add" data-group="${esc(g.name)}" title="Add an account to ${esc(g.name)}" aria-label="Add an account to ${esc(g.name)}">${I.plus}</button>
           </div>
-          <div class="group-body" role="list">${g.accounts.length ? '<div class="acct-head" aria-hidden="true"><span class="name" title="Your Claude accounts">Account</span><span class="first" title="Session (5 hour) usage">5h</span><span title="Weekly (7 day) usage">Week</span><span class="use" title="The account Claude uses now, or a button to switch to another">Use</span></div>' : ''}${g.accounts.map(accountRow).join('')}${g.accounts.length === 1 ? '<div class="hint">Have another Claude account? <button class="link" data-act="add">Add it</button> to switch in one click.</div>' : ''}</div>
+          <div class="group-body" role="list">${g.accounts.length ? '<div class="acct-head" aria-hidden="true"><span class="name" title="Your Claude accounts">Account</span><span class="first" title="Session (5 hour) usage">5h</span><span class="week-head" title="Weekly (7 day) usage, and the time until it resets"><span>Week</span><span class="until">Reset</span></span><span class="use" title="The account Claude uses now, or a button to switch to another">Use</span></div>' : ''}${orderedAccounts(g.accounts).map(accountRow).join('')}${g.accounts.length === 1 ? '<div class="hint">Have another Claude account? <button class="link" data-act="add">Add it</button> to switch in one click.</div>' : ''}</div>
         </div>`;
       })
       .join('');
+    placeBells();
   }
 
   /**
-   * Short alert wording, used by the card, the bell and its hover:
-   *   title: the point in a few words; line: the key numbers; detail: the full reasoning (hover only).
+   * Alert wording. headline: the advice, shown once (card header). why: the reasoning, shown once (info
+   * icon). Used %, reset time and session left are not repeated here: the meters above show them.
    */
   function alertCopy(al) {
-    const resets = `resets ${new Date(al.resetsAt).toLocaleString([], { weekday: 'short', hour: 'numeric' })}`;
-    const title = al.level === 'final' ? (al.maxReach < 100 ? `Max ${al.maxReach}% reachable` : 'Use every session fully') : `On pace for ${al.projected}%`;
-    const line = `${al.unused}% left · ${resets} · ${al.need} of ${al.fit} sessions needed`;
-    const detail = [
-      al.level === 'final' ? 'Final alert' : 'Reminder',
-      `Weekly used|${al.used}%`,
-      `Your pace|${al.pace.sessionsPerDay}/day at ${al.pace.avgUse}%${al.pace.learned ? '' : ' (est.)'}`,
-      `Reach at your pace|${al.projected}%`,
-      `Reach at full use|${al.maxReach}%`,
-      al.inSession ? `Current session left|${al.sessionLeft}%` : '',
-    ].filter(Boolean).join('\n');
-    return { title, line, detail };
+    const aim = Math.max(1, Math.min(100, Number(al.aim) || 100));
+    const headline = aim >= 100 ? 'Use every session in full' : `Aim for ${aim}% per session`;
+    const why = [
+      al.level === 'final' ? 'Little time left this week' : 'Some of this week may go unused',
+      `Your usual pace|${al.pace.sessionsPerDay} a day, ${al.pace.avgUse}% each${al.pace.learned ? '' : ' (guess)'}`,
+      `At that pace|${al.projected}% by the reset`,
+      `Best case|${al.maxReach}% if every session is used in full`,
+    ].join('\n');
+    return { headline, why };
   }
 
-  /** Bell next to the account name when its weekly limit is at risk of going unused (icon + text, never color alone). */
+  /** The bell's hover: the advice, how many sessions fit, what is left, and any auto-start. Short on purpose. */
+  function alertSummary(a, al) {
+    const n = (al.slots && al.slots.length) || Math.floor(al.fit);
+    const set = (state.autoStarts || []).filter((x) => x.key === a.key).length;
+    return [
+      alertCopy(al).headline,
+      `Sessions left|${n} before the reset`,
+      `Left this week|${al.unused}%`,
+      set ? `Auto-start|${set} set` : '',
+      'Select this account to see the plan.',
+    ].filter(Boolean).join('\n');
+  }
+
+  /** Bell next to the account name: only says there is a reminder; the card has the rest. */
   function alertIcon(a) {
     const al = a.weekly && a.weekly.alert;
     if (!al) return '';
-    const c = alertCopy(al);
-    const tip = `${al.level === 'final' ? 'Final alert' : 'Reminder'}: ${c.title}\n${c.line.split(' · ').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('\n')}`;
-    return `<span class="acct-alert ${al.level}" role="img" aria-label="${esc(tip.replace(/\n/g, ', '))}" data-tip="${esc(tip)}">${I.bell}</span>`;
+    const tip = alertSummary(a, al);
+    return `<span class="acct-bell" role="img" aria-label="Weekly reminder" data-tip="${esc(tip)}">${I.bell}</span>`;
+  }
+  /** The same bell for the picture (shown only when the name has no room for it). */
+  function picBell(a) {
+    const al = a.weekly && a.weekly.alert;
+    return al ? `<span class="avatar-alert av-bell" aria-hidden="true" data-tip="${esc(alertSummary(a, al))}">${I.bell}</span>` : '';
+  }
+
+  /**
+   * The bell sits after the account name. When the panel is so narrow that the name is cut off, the bell
+   * would be the first thing to go, so it moves onto the account picture (top right) instead.
+   * Measured with the bell in its normal place, so the choice never flips back and forth.
+   */
+  function placeBells() {
+    document.querySelectorAll('.acct').forEach((row) => {
+      const cell = row.querySelector('.acct-name');
+      const label = row.querySelector('.acct-label');
+      const bell = row.querySelector('.acct-bell');
+      const tight = Boolean(cell && label && bell) && label.scrollWidth + 17 > cell.clientWidth;
+      row.classList.toggle('bell-on-pic', tight);
+    });
   }
 
   function accountRow(a) {
@@ -253,7 +312,10 @@
     // Session (5-hour) and weekly usage, each in its own column so the numbers line up.
     const level = (p) => (p >= 100 ? 'full' : p >= 80 ? 'warn' : '');
     const col = (w, name) => `<span class="acct-col" title="${name} usage">${w ? `<span class="${level(w.percent)}">${w.percent}%</span>` : ''}</span>`;
-    const use = `${col(a.usage && a.usage.session, 'Session (5hr)')}${col(a.usage && a.usage.weekly, 'Weekly (7 day)')}`;
+    const wk = a.usage && a.usage.weekly;
+    const until = wk && wk.resetsAt ? untilShort(wk.resetsAt) : '';
+    const weekCol = `<span class="acct-col acct-week" title="${esc(wk ? `Weekly (7 day) usage: ${wk.percent}%${wk.resetsAt ? `\n${resetText(wk.resetsAt)}` : ''}` : 'Weekly (7 day) usage')}">${wk ? `<span class="${level(wk.percent)}">${wk.percent}%</span>${until ? `<span class="until" data-until="${esc(wk.resetsAt)}">${until}</span>` : ''}` : ''}</span>`;
+    const use = `${col(a.usage && a.usage.session, 'Session (5hr)')}${weekCol}`;
     const tip = [
       a.label,
       a.status === 'signedIn' ? [a.email, a.plan, orgName(a)].filter(Boolean).join(' · ') : a.status === 'signedOut' ? 'Not signed in' : a.status === 'error' ? 'Claude Code not found' : 'Checking sign-in…',
@@ -263,8 +325,8 @@
     ].filter(Boolean).join('\n');
     return `<div class="acct ${a.status} ${sel ? 'sel' : ''} ${a.active ? 'active' : ''}" role="listitem" tabindex="0" draggable="true" data-key="${esc(a.key)}" aria-current="${sel}" title="${esc(tip)}"
         data-vscode-context="${ctx({ webviewSection: 'account', accountKey: a.key, isActive: a.active, signedIn: a.status === 'signedIn', signedOut: a.status === 'signedOut' })}">
-      <span class="avatar${avatarText(a.label, a).length > 1 ? ' two' : ''}">${esc(avatarText(a.label, a))}</span>
-      <span class="acct-name ellipsis">${esc(a.label)}${alertIcon(a)}</span>
+      <span class="avatar${avatarText(a.label, a).length > 1 ? ' two' : ''}"><span class="av-letter">${esc(avatarText(a.label, a))}</span>${picBell(a)}</span>
+      <span class="acct-name"><span class="acct-label ellipsis">${esc(a.label)}</span>${alertIcon(a)}</span>
       ${use}
       <span class="acct-side">${side}</span>
     </div>`;
@@ -286,8 +348,8 @@
 
   // ---------- Weekly plan ----------
 
-  const shortTime = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  const dayTime = (ms) => new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  const shortTime = (ms) => atMinute(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const dayTime = (ms) => atMinute(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 
 
   let chartModel = null; // what the chart shows, for the mouse tracker: { start, span, segs: [{ c (curve), lineStart, lineEnd }] }
@@ -873,7 +935,7 @@
 
   /** "5:10 PM" today, "tomorrow 9 AM", else "Sat 9:30 AM". */
   function resetShort(iso) {
-    const d = new Date(iso);
+    const d = atMinute(iso);
     if (Number.isNaN(d.getTime())) return '';
     const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).replace(':00', '');
     const today = new Date();
@@ -881,6 +943,15 @@
     if (d.toDateString() === today.toDateString()) return time;
     if (d.toDateString() === tomorrow.toDateString()) return `tomorrow ${time}`;
     return `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  }
+
+  /** "3d", "19h", "<1h": time until a reset, for the account list. Whole days once a day or more away. */
+  function untilShort(iso) {
+    const ms = atMinute(iso).getTime() - Date.now();
+    if (!Number.isFinite(ms) || ms <= 0) return '';
+    if (ms >= 864e5) return `${Math.floor(ms / 864e5)}d`;
+    if (ms >= 36e5) return `${Math.floor(ms / 36e5)}h`;
+    return '<1h';
   }
 
   /** "5 days left", "1 day left", "6h left", "under 1h left". */
@@ -908,23 +979,101 @@
     </div>`;
   }
 
-  /** When the bell shows: one box per 5-hour session that still fits before the weekly reset, filled for the ones needed to use what is left. */
+  /** "in 3h 20m", "in 45m": how far away a time is. */
+  function inText(ms) {
+    const m = Math.max(0, Math.round((ms - Date.now()) / 60000));
+    if (m < 60) return `in ${m}m`;
+    const h = Math.floor(m / 60);
+    return `in ${h}h${m % 60 ? ` ${m % 60}m` : ''}`;
+  }
+  /** "5h", "4h 50m": a length of time. */
+  function spanText(ms) {
+    const m = Math.round(ms / 60000);
+    const h = Math.floor(m / 60);
+    return `${h}h${m % 60 ? ` ${m % 60}m` : ''}`;
+  }
+
+  const SAME_WINDOW_MS = 5 * 60 * 1000; // a schedule belongs to a window when their starts are this close
+  const armedFor = (a, start) => (state.autoStarts || []).find((x) => x.key === a.key && Math.abs(x.start - start) <= SAME_WINDOW_MS);
+
+  /**
+   * The bell card. Header: the advice (aim per session), with the clock badge and the "why" icon.
+   * Open: a small timeline from now to the weekly reset. Each box is one 5-hour session window, placed
+   * between its start and end times, filled to the aim. Hover a box for that window; click a later one to
+   * auto-start it (one tiny Haiku message just after it opens, then the schedule removes itself).
+   */
   function sessionsGraph(a) {
     const al = a.weekly && a.weekly.alert;
     if (!al) return '';
-    const total = Math.max(1, Math.min(28, Math.floor(al.fit)));
-    const need = Math.min(total, Math.max(1, Math.ceil(al.need)));
-    const boxes = Array.from({ length: total }, (_, i) => {
-      const first = i === 0 && al.inSession;
-      const use = i < need;
-      const tip = first ? `Current session, ${al.sessionLeft}% left` : use ? 'Session worth starting' : 'Spare session';
-      return `<i class="slot ${use ? 'use' : 'spare'}${first ? ' now' : ''}" title="${esc(tip)}"></i>`;
-    }).join('');
-    const nFit = Math.floor(al.fit);
-    return `<div class="possible ${al.level}" title="${esc(alertCopy(al).detail.replace(/|/g, ': '))}">
-      <div class="possible-top"><span>${I.bell} ${nFit} session${nFit === 1 ? '' : 's'} fit before reset</span><button class="btn tiny" data-act="newSession" data-key="${esc(a.key)}" title="Start a new session with ${esc(a.label)}">Start</button></div>
-      <div class="slots" role="img" aria-label="${total} sessions fit, ${need} needed to use the ${al.unused}% left">${boxes}</div>
-      <div class="possible-foot">${need} to use the ${al.unused}% left · ${esc(alertCopy(al).title.toLowerCase())}</div>
+    const open = ui.alertOpen === true; // folded until you open it
+    const slots = al.slots && al.slots.length ? al.slots : [];
+    const copy = alertCopy(al);
+    const mine = (state.autoStarts || []).filter((x) => x.key === a.key).sort((x, y) => x.start - y.start);
+    const tiny = (ms) => atMinute(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); // 4:13 PM
+    // Only the windows until the weekly reset are shown. As their number grows the card does not: one row
+    // holds as many as fit the panel (about 42px each, so every time, even "Sat 4:11 AM", stays readable). When there are more,
+    // the row ends with a "+N" chip (hover lists them, click shows all); shown in full they wrap into
+    // further rows of the same size, and a "Less" chip folds them back.
+    const avail = Math.max(150, document.body.clientWidth - 70);
+    const perRow = Math.max(3, Math.min(8, Math.floor(avail / 42)));
+    const many = slots.length > perRow;
+    const all = many && ui.tlAll === true;
+    const visible = many && !all ? slots.slice(0, perRow - 1) : slots;
+    const hiddenList = slots.slice(visible.length);
+    const dayOf = (ms) => atMinute(ms).toDateString();
+    const weekday = (ms) => atMinute(ms).toLocaleDateString('en-US', { weekday: 'short' });
+    const seg = (s, i, j, lastInRow) => {
+      const armed = armedFor(a, s.start);
+      const waiting = s.start > Date.now() + 60000; // a window that starts later can be scheduled
+      const rows = [`${dayTime(s.start)} to ${shortTime(s.end)}`];
+      if (s.current) rows.push('Your current session');
+      if (s.gain) rows.push(`Adds|about ${s.gain}% to the week`);
+      if (waiting) rows.push(armed ? 'Auto-start is on. Click to cancel.' : 'Click to auto-start this session.');
+      const label = `${s.current ? 'Current session' : 'Session'} ${dayTime(s.start)} to ${shortTime(s.end)}${armed ? ', auto-start on' : ''}`;
+      const cls = `tl-box${s.current ? ' now' : ''}${armed ? ' armed' : ''}`;
+      const box = waiting
+        ? `<button class="${cls}" data-act="autoStart" data-key="${esc(a.key)}" data-start="${armed ? armed.start : s.start}" aria-pressed="${Boolean(armed)}" aria-label="${esc(label)}" data-tip="${esc(rows.join('\n'))}"></button>`
+        : `<i class="${cls}" role="img" aria-label="${esc(label)}" data-tip="${esc(rows.join('\n'))}"></i>`;
+      // Times sit on the boundaries, alternating above and below; a new day (or a new row) names the day.
+      const newDay = i > 0 && dayOf(s.start) !== dayOf(slots[i - 1].start);
+      const text = s.current ? 'now' : `${newDay || (j === 0 && i > 0) ? `${weekday(s.start)} ` : ''}${tiny(s.start)}`;
+      const start = `<span class="tl-t ${j % 2 ? 'up' : 'down'}${j === 0 ? ' first' : ''}">${text}</span>`;
+      const end = lastInRow ? `<span class="tl-t ${(j + 1) % 2 ? 'up' : 'down'} end">${tiny(s.end)}</span>` : '';
+      const grow = Math.max(0.45, (s.end - s.start) / (5 * 3600000));
+      return `<div class="tl-seg${newDay && j > 0 ? ' day-start' : ''}" style="flex:${grow} 1 0">${box}${start}${end}</div>`;
+    };
+    const chunks = [];
+    for (let k = 0; k < visible.length; k += perRow) chunks.push(visible.slice(k, k + perRow));
+    const moreTip = ['More sessions until the reset', ...hiddenList.map((s) => `${dayTime(s.start)}|to ${shortTime(s.end)}`), 'Click to show all'].join('\n');
+    const lines = chunks
+      .map((row, r) => {
+        const base = r * perRow;
+        const isLast = r === chunks.length - 1;
+        const chip = isLast && many
+          ? all
+            ? '<button class="tl-more" data-act="tlAll" title="Show fewer sessions">Less</button>'
+            : `<button class="tl-more" data-act="tlAll" data-tip="${esc(moreTip)}" aria-label="${hiddenList.length} more sessions, show all">+${hiddenList.length}</button>`
+          : '';
+        return `<div class="tl" role="group">${row.map((s, j) => seg(s, base + j, j, j === row.length - 1)).join('')}${chip}</div>`;
+      })
+      .join('');
+    const badge = mine.length
+      ? `<span class="auto-badge" data-tip="${esc(['Auto-start set', ...mine.map((x) => `${dayTime(x.start)}|${inText(x.start)}`)].join('\n'))}" tabindex="0">${I.clock}${mine.length}</span>`
+      : '';
+    const sim = al.simulated ? '<span class="demo-chip" title="A test alert. Your real usage is not affected.">Demo</span>' : '';
+    const info = `<span class="possible-detail" data-tip="${esc(copy.why)}" tabindex="0" aria-label="Why this advice">${I.info}</span>`;
+    const body = open
+      ? `<div class="possible-body">
+          <div class="tl-lines" aria-label="${slots.length} session windows until the weekly reset">${lines}</div>
+          <div class="possible-legend"><span>${mine.length ? `<i class="sw" aria-hidden="true"></i>Auto-start on` : 'Click a session to auto-start it.'}</span><button class="btn tiny primary" data-act="newSession" data-key="${esc(a.key)}" title="Start a new session with ${esc(a.label)}">Start now</button></div>
+        </div>`
+      : '';
+    return `<div class="possible ${al.level} ${open ? 'open' : 'shut'}">
+      <div class="possible-top">
+        <button class="possible-toggle" data-act="toggleAlert" aria-expanded="${open}" title="${open ? 'Hide' : 'Show'} the sessions until the weekly reset">${I.chev}<span class="possible-title">${I.bell}<span class="ellipsis">${copy.headline}</span></span></button>
+        ${sim}${badge}${info}
+      </div>
+      ${body}
     </div>`;
   }
 
@@ -958,12 +1107,12 @@
     const isLiveNow = Boolean(u && u.live && Date.now() - u.fetchedAt < 30 * 60 * 1000);
     const ageTip =
       (relayOn
-        ? 'Updates within a second of every Claude reply, and about every 5 minutes while this panel is open.'
+        ? 'Updates within a second of every Claude reply, and about every 30 seconds while this panel is open.'
         : state.relay === 'foreign'
-          ? 'Reply-by-reply updates are off because another tool already wraps Claude (claudeCode.claudeProcessWrapper). Usage still refreshes about every 5 minutes while this panel is open.'
+          ? 'Reply-by-reply updates are off because another tool already wraps Claude (claudeCode.claudeProcessWrapper). Usage still refreshes about every 30 seconds while this panel is open.'
           : state.relay === 'unsupported'
-            ? 'Updates about every 5 minutes while this panel is open, or when you press refresh.'
-            : 'Reply-by-reply updates are off. Usage still refreshes about every 5 minutes while this panel is open.') +
+            ? 'Updates about every 30 seconds while this panel is open, or when you press refresh.'
+            : 'Reply-by-reply updates are off. Usage still refreshes about every 30 seconds while this panel is open.') +
       (lv.checkedAt ? `
 Last asked Claude: ${new Date(lv.checkedAt).toLocaleTimeString()}` : '');
     // Freshness and refresh live in the section header, so the body is only the numbers.
@@ -1131,7 +1280,7 @@ Output: ${num(r.output)} tokens`;
       const groups = [...byFolder.values()].sort((x, y) => Number(y.current) - Number(x.current));
       let budget = ui.limit;
       groups.forEach((f, i) => {
-        const open = ui.fold[f.k] != null ? !ui.fold[f.k] : f.current || i < 3;
+        const open = ui.fold[f.k] != null ? !ui.fold[f.k] : false; // project groups start folded
         html += `<button class="folder-head ${f.current ? 'current' : ''} ${open ? '' : 'folded'}" data-fold="${esc(f.k)}" title="${esc(f.path)}" aria-expanded="${open}">${I.chev}<span class="ellipsis">${esc(f.name)}</span>${f.current ? '<span class="badge">Open</span>' : ''}<span class="count">${f.items.length}</span></button>`;
         if (!open) return;
         const take = f.items.slice(0, Math.max(0, budget));
@@ -1208,6 +1357,7 @@ Output: ${num(r.output)} tokens`;
     document.querySelectorAll('[data-reset]').forEach((el) => (el.textContent = resetText(el.dataset.reset)));
     document.querySelectorAll('[data-reset-short]').forEach((el) => (el.textContent = `resets ${resetShort(el.dataset.resetShort)}`));
     document.querySelectorAll('[data-left]').forEach((el) => (el.textContent = leftText(el.dataset.left)));
+    document.querySelectorAll('[data-until]').forEach((el) => (el.textContent = untilShort(el.dataset.until)));
     document.querySelectorAll('[data-ago-short]').forEach((el) => (el.textContent = ago(Number(el.dataset.agoShort))));
     document.querySelectorAll('.sess').forEach((el) => {
       const dot = el.querySelector('.sdot');
@@ -1215,6 +1365,15 @@ Output: ${num(r.output)} tokens`;
     });
   }
   setInterval(tick, 1000);
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (!state) return;
+      placeBells();
+      renderUsage();
+    }, 150);
+  });
 
   // ---------- Events ----------
 
@@ -1251,6 +1410,27 @@ Output: ${num(r.output)} tokens`;
         ui.details = !ui.details;
         save();
         return renderUsageMore();
+      case 'sortAccounts':
+        ui.sortAccounts = ui.sortAccounts === 'manual' ? 'limit' : 'manual';
+        save();
+        return renderAccounts();
+      case 'tlAll':
+        ui.tlAll = !ui.tlAll;
+        save();
+        return renderUsage();
+      case 'toggleAlert':
+        ui.alertOpen = ui.alertOpen !== true;
+        save();
+        return renderUsage();
+      case 'autoStart': {
+        const start = Number(el.dataset.start);
+        const list = state.autoStarts || [];
+        const near = (x) => x.key === el.dataset.key && Math.abs(x.start - start) <= 5 * 60 * 1000;
+        const on = !list.some(near);
+        state.autoStarts = on ? [...list, { key: el.dataset.key, start }] : list.filter((x) => !near(x));
+        renderUsage();
+        return send('autoStart', { key: el.dataset.key, start, on });
+      }
       case 'rate':
         return send('rate');
       case 'hideRate':
@@ -1351,6 +1531,10 @@ Output: ${num(r.output)} tokens`;
 
   const accountKeys = () => accounts().map((a) => a.key);
   function moveAccount(dragKey, targetKey, after) {
+    if (ui.sortAccounts !== 'manual') {
+      state.groups[0].accounts = orderedAccounts(state.groups[0].accounts); // start from what you see
+      ui.sortAccounts = 'manual';
+    }
     const keys = accountKeys().filter((k) => k !== dragKey);
     let i = targetKey ? keys.indexOf(targetKey) : keys.length;
     if (i < 0) return;

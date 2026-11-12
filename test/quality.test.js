@@ -155,7 +155,7 @@ function loadAvatarTexts() {
 
 test('account pictures: unique names get one letter', () => {
   const av = loadAvatarTexts();
-  assert.deepEqual(av(['Kaya', 'Abhishek', 'Shristi']), ['K', 'A', 'S']);
+  assert.deepEqual(av(['Kira', 'Alex', 'Sam']), ['K', 'A', 'S']);
   assert.deepEqual(av(['Work']), ['W']);
 });
 
@@ -229,4 +229,37 @@ test('demo data used for the media is fictional', () => {
   const demo = read('scripts/capture/demo-data.js');
   assert.match(demo, /\.example/);
   assert.doesNotMatch(demo, /@(gmail|outlook|hotmail|yahoo|example|ds\.study)/i);
+});
+
+test('one accent colour: no chart or git colours, and the accent is defined once per stylesheet', () => {
+  for (const f of ['media/panel.css', 'media/chat.css']) {
+    const css = read(f);
+    assert.doesNotMatch(css, /--vscode-charts-|--vscode-gitDecoration-|--vscode-testing-iconPassed/, `${f} uses an extra colour`);
+    assert.match(css, /--accent: var\(--vscode-focusBorder/, `${f} defines the accent`);
+  }
+});
+
+test('every visible colour comes from the VS Code theme (three roles: text, accent, error)', () => {
+  for (const f of ['media/panel.css', 'media/chat.css']) {
+    const bare = read(f)
+      .split('\n')
+      .filter((l) => !/^\s*\/?\*/.test(l) && !/mask-image/.test(l))
+      .map((l) => l.replace(/var\(--vscode-[\w-]+,\s*(var\(--vscode-[\w-]+,\s*)?(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))\)?\)/g, ''))
+      .filter((l) => /#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(l));
+    assert.deepEqual(bare, [], `${f} has colours that are not from the theme`);
+  }
+});
+
+test('accounts are ordered by the soonest weekly reset, then by less limit left, unless you chose your own order', () => {
+  const a = panel.indexOf('function orderedAccounts');
+  const b = panel.indexOf('function renderAccounts');
+  assert.ok(a > 0 && b > a, 'orderedAccounts not found');
+  const fn = new Function('ui', `${panel.slice(a, b)}; return orderedAccounts;`);
+  const H = 3600e3;
+  const at = (h) => new Date(Date.now() + h * H).toISOString();
+  const acct = (label, weekly, resetH, status = 'signedIn') => ({ label, status, usage: weekly == null ? null : { weekly: { percent: weekly, resetsAt: resetH == null ? null : at(resetH) } } });
+  const list = [acct('Four', 10, 96), acct('One', 80, 24), acct('Out', null, null, 'signedOut'), acct('Two', 30, 24), acct('Nine', 50, 9), acct('NoReset', 20, null)];
+  const byReset = fn({ sortAccounts: 'reset' })(list).map((x) => x.label);
+  assert.deepEqual(byReset, ['Nine', 'One', 'Two', 'Four', 'Out', 'NoReset'], 'soonest reset first; same reset: less left first; unknown last in your order');
+  assert.deepEqual(fn({ sortAccounts: 'manual' })(list).map((x) => x.label), list.map((x) => x.label), 'your own order is untouched');
 });

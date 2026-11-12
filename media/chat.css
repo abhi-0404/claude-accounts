@@ -6,11 +6,11 @@
   --hover: var(--vscode-list-hoverBackground);
   --focus: var(--vscode-focusBorder);
   --link: var(--vscode-textLink-foreground);
-  --soft: rgba(128, 128, 128, 0.1);
-  --softer: rgba(128, 128, 128, 0.2);
-  --warn: var(--vscode-editorWarning-foreground, #cca700);
+  --soft: color-mix(in srgb, var(--vscode-foreground) 8%, transparent);
+  --softer: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
+  --warn: var(--accent);
   --err: var(--vscode-errorForeground, #f14c4c);
-  --ok: var(--vscode-testing-iconPassed, #73c991);
+  --ok: var(--accent);
   --code-bg: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
   --input-bg: var(--vscode-input-background);
   --input-border: var(--vscode-input-border, var(--line));
@@ -110,8 +110,8 @@ main { flex: 1; overflow-y: auto; overflow-x: hidden; }
   background: var(--code-bg); border-radius: 4px;
 }
 pre.errtext { color: var(--err); }
-pre.diff .del { color: var(--vscode-gitDecoration-deletedResourceForeground, #c74e39); }
-pre.diff .ins { color: var(--vscode-gitDecoration-addedResourceForeground, #81b88b); }
+pre.diff .del { color: var(--err); }
+pre.diff .ins { color: var(--accent); }
 .todos { list-style: none; margin: 4px 0; padding: 0; }
 .todos .completed { color: var(--muted); text-decoration: line-through; }
 .todos .in_progress { font-weight: 600; }
@@ -211,4 +211,12 @@ body.vscode-light select, body.vscode-high-contrast-light select { color-scheme:
   .dot.run, .spinner { animation: none; }
   .spinner { border-top-color: var(--softer); }
   * { scroll-behavior: auto !important; }
+}
+
+/* One accent colour, as in the panel: the theme's focus colour. Red only for failures and removed lines. */
+:root {
+  --accent: var(--vscode-focusBorder, #0078d4);
+  --link: var(--accent);
+  --warn: var(--accent);
+  --ok: var(--accent);
 }

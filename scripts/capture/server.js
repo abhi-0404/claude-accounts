@@ -1,8 +1,10 @@
 // Serves the demo: /media from the extension, /state.js built from fictional data, everything else from this folder.
+//   node server.js [port]      (default 5190; the alert simulation page is /alert-demo.html)
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const lib = require('../../lib.js');
+const history = require('../../history.js');
 const { build, ACCOUNTS } = require('./demo-data.js');
 
 const media = path.resolve(__dirname, '..', '..', 'media');
@@ -13,7 +15,14 @@ function stateScript() {
   const states = {};
   for (const sel of ACCOUNTS) for (const act of ACCOUNTS) states[`${sel.label}|${act.label}`] = build(sel.label, act.label, now);
   const keys = Object.fromEntries(ACCOUNTS.map((a) => [lib.normalizeDir(a.configDir), a.label]));
-  return `window.DEMO_STATES = ${JSON.stringify(states).replace(/</g, '\\u003c')};\nwindow.DEMO_KEYS = ${JSON.stringify(keys)};`;
+  // A made-up weekly alert for every account, used by the alert simulation page.
+  const alert = history.weeklyAlert(history.demoPlan(now), 0.12, now, { sessionsPerDay: 1.2, avgUse: 30, learned: true });
+  const alerts = Object.fromEntries(ACCOUNTS.map((a) => [a.label, { ...alert, simulated: true }]));
+  return [
+    `window.DEMO_ALERTS = ${JSON.stringify(alerts)};`,
+    `window.DEMO_STATES = ${JSON.stringify(states).replace(/</g, '\\u003c')};`,
+    `window.DEMO_KEYS = ${JSON.stringify(keys)};`,
+  ].join('\n');
 }
 
 function start(port = 5190) {
@@ -38,4 +47,7 @@ function start(port = 5190) {
 }
 
 module.exports = { start };
-if (require.main === module) start().then(() => console.log('demo on http://127.0.0.1:5190'));
+if (require.main === module) {
+  const port = Number(process.argv[2]) || 5190;
+  start(port).then(() => console.log(`demo on http://127.0.0.1:${port}`));
+}

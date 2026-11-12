@@ -222,6 +222,21 @@ async function readFileRecords(file) {
   return c.records;
 }
 
+/** Every reply recorded in the chat transcripts since a time (files untouched since then are skipped). */
+async function readReplyRecords(dir, sinceMs = 0) {
+  const files = await listTranscripts(projectsPath(dir));
+  const records = [];
+  for (const f of files) {
+    try {
+      if (sinceMs && (await fs.promises.stat(f)).mtimeMs < sinceMs) continue;
+      for (const r of await readFileRecords(f)) records.push(r);
+    } catch {
+      // unreadable file: skip it
+    }
+  }
+  return records;
+}
+
 async function listTranscripts(root) {
   const out = [];
   async function walk(dir, top) {
@@ -520,6 +535,7 @@ module.exports = {
   readFileRecords,
   aggregate,
   readModelUsage,
+  readReplyRecords,
   encodeProjectPath,
   sameKey,
   readSessionMeta,

@@ -7,13 +7,13 @@
   --sel: var(--vscode-list-inactiveSelectionBackground);
   --focus: var(--vscode-focusBorder);
   --link: var(--vscode-textLink-foreground);
-  --soft: rgba(128, 128, 128, 0.13);
-  --softer: rgba(128, 128, 128, 0.24);
-  --track: rgba(128, 128, 128, 0.22);
+  --soft: color-mix(in srgb, var(--vscode-foreground) 10%, transparent);
+  --softer: color-mix(in srgb, var(--vscode-foreground) 18%, transparent);
+  --track: color-mix(in srgb, var(--vscode-foreground) 16%, transparent);
   --fill: color-mix(in srgb, var(--vscode-foreground) 70%, transparent);
-  --warn: var(--vscode-editorWarning-foreground, #cca700);
+  --warn: var(--accent);
   --err: var(--vscode-errorForeground, #f14c4c);
-  --ok: var(--vscode-testing-iconPassed, #73c991);
+  --ok: var(--accent);
   --pad: 14px;
 }
 
@@ -174,7 +174,7 @@ svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; s
 .alert .btn { align-self: flex-start; margin-top: 2px; }
 .stats { display: flex; gap: 8px; margin: 4px 0 8px; }
 .stat { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; background: var(--soft); }
-.stat-num { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-num { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stat-label { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 250px) { .stats { flex-wrap: wrap; } .stat { flex-basis: 40%; } }
 
@@ -211,7 +211,7 @@ svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; s
   position: fixed; z-index: 50; display: none; max-width: 240px; padding: 6px 8px; border-radius: 4px; white-space: pre-line;
   font-size: 12px; line-height: 1.4; pointer-events: none;
   color: var(--vscode-editorHoverWidget-foreground, var(--fg)); background: var(--vscode-editorHoverWidget-background, #252526);
-  box-shadow: 0 0 0 1px var(--vscode-editorHoverWidget-border, var(--line)), 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px var(--vscode-editorHoverWidget-border, var(--line)), 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.35));
 }
 .tip { min-width: 190px; white-space: normal; }
 .tip-title { font-weight: 600; margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -433,8 +433,8 @@ svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; s
 .more-table summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 3px 0; list-style-position: inside; }
 .more-table summary:hover { color: var(--fg); }
 .more-table[open] summary { margin-bottom: 4px; }
-.plot.sessions svg path { stroke: var(--vscode-charts-orange, #d18616); stroke-width: 1.5px; }
-.lg-line { background: var(--vscode-charts-orange, #d18616); }
+.plot.sessions svg path { stroke: var(--accent); stroke-width: 1.5px; }
+.lg-line { background: var(--accent); }
 
 /* ---------- Days left on the weekly limit ---------- */
 .meter-top .left-pill {
@@ -455,11 +455,11 @@ svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; s
 .chart.z4 .plot.sessions { height: 170px; }
 .sbar { opacity: 0.8; }
 .plot.sessions svg { z-index: 3; pointer-events: none; }
-.plot.sessions svg path { stroke: var(--vscode-charts-orange, #d18616); stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; }
+.plot.sessions svg path { stroke: var(--accent); stroke-width: 2.5px; stroke-linejoin: round; stroke-linecap: round; }
 .plot.sessions svg path.halo { stroke: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e)); stroke-width: 5.5px; }
 .wdot {
   position: absolute; z-index: 4; width: 7px; height: 7px; margin: 0 0 -3.5px -3.5px; border-radius: 50%;
-  background: var(--vscode-charts-orange, #d18616); box-shadow: 0 0 0 1.5px var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
+  background: var(--accent); box-shadow: 0 0 0 1.5px var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
   cursor: default;
 }
 .wdot::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; } /* easier to hit */
@@ -479,10 +479,10 @@ svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; s
 .fact b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .fact span { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cap { font-size: 10px; color: var(--muted); margin: 0 0 2px; }
-.gl i { position: absolute; right: 2px; top: 1px; font-size: 9px; font-style: normal; line-height: 1; color: var(--muted); opacity: 0.7; pointer-events: none; }
+.gl i { position: absolute; right: 2px; top: 1px; font-size: 10px; font-style: normal; line-height: 1; color: var(--muted); opacity: 0.7; pointer-events: none; }
 .plot.sessions { margin-top: 2px; }
 .legend .lg-bars { color: var(--muted); }
-.legend .lg-week { color: var(--vscode-charts-orange, #d18616); }
+.legend .lg-week { color: var(--accent); }
 .legend span[title] { cursor: default; }
 
 /* ---------- Chart, reworked: quiet bars behind, one clean weekly line in front, mouse tracker ---------- */
@@ -494,14 +494,14 @@ svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; s
 .sbar.current:hover { background: var(--link); }
 .plot.sessions svg path { stroke-width: 2px; }
 .plot.sessions svg path.halo { stroke-width: 4.5px; }
-.plot.sessions svg path.area { stroke: none; fill: color-mix(in srgb, var(--vscode-charts-orange, #d18616) 12%, transparent); }
+.plot.sessions svg path.area { stroke: none; fill: color-mix(in srgb, var(--accent) 12%, transparent); }
 .wdot { pointer-events: none; }
 .wdot.nowdot { width: 7px; height: 7px; margin: 0 0 -3.5px -3.5px; }
 .track { position: absolute; top: 0; bottom: 0; width: 0; z-index: 5; pointer-events: none; border-left: 1px solid color-mix(in srgb, var(--fg) 45%, transparent); }
 .track[hidden] { display: none; }
 .track i {
   position: absolute; left: -5px; width: 9px; height: 9px; margin-bottom: -4.5px; border-radius: 50%;
-  background: var(--vscode-charts-orange, #d18616); box-shadow: 0 0 0 2px var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
+  background: var(--accent); box-shadow: 0 0 0 2px var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
 }
 .track i[hidden] { display: none; }
 .tip { pointer-events: none; }
@@ -592,8 +592,8 @@ select option:checked, select option:hover { background-color: var(--vscode-list
 .owner { border-radius: 4px; font-weight: 600; }
 .signedOut .avatar, .checking .avatar { color: var(--muted); background: transparent; box-shadow: inset 0 0 0 1px var(--muted); }
 .acct.sel .avatar { box-shadow: inset 0 0 0 1px var(--link); }
-.avatar.two { font-size: 8px; letter-spacing: -0.3px; }
-.owner.two { width: auto; min-width: 14px; padding: 0 3px; font-size: 8px; }
+.avatar.two { font-size: 9px; letter-spacing: -0.3px; }
+.owner.two { width: auto; min-width: 14px; padding: 0 3px; font-size: 9px; }
 
 /* Bigger click target for Switch without changing how it looks */
 .acct .pill { position: relative; }
@@ -632,3 +632,241 @@ select option:checked, select option:hover { background-color: var(--vscode-list
 .rate-stars:hover { color: var(--warn); background: var(--hover); }
 
 .meter.idle { opacity: 0.55; }
+
+/* Session windows: hover for the times, click a future one to auto-start it */
+button.slot { padding: 0; border: 0; cursor: pointer; }
+button.slot:hover, button.slot:focus-visible { outline: 1px solid var(--fg); outline-offset: 1px; }
+.slot.armed { position: relative; box-shadow: inset 0 0 0 1.5px var(--fg); }
+.slot.armed::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--vscode-editor-background, #1f1f1f); }
+.possible-top > span[data-tip] { cursor: default; }
+
+/* The bell card: one quiet line when collapsed */
+.possible { padding: 4px 8px; gap: 2px; }
+.possible-top { display: flex; align-items: center; gap: 6px; min-width: 0; justify-content: flex-start; }
+.possible-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 24px; text-align: left; color: var(--fg); }
+.possible-toggle > svg { width: 12px; height: 12px; flex: none; transition: transform 0.12s ease; color: var(--muted); }
+.possible.shut .possible-toggle > svg { transform: rotate(-90deg); }
+.possible-title { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.possible-title svg { width: 13px; height: 13px; flex: none; color: var(--warn); }
+.possible-body { display: flex; flex-direction: column; gap: 6px; padding: 2px 0 4px 18px; }
+.possible-actions { display: flex; }
+.possible-detail, .auto-badge { display: inline-flex; align-items: center; flex: none; color: var(--muted); border-radius: 3px; }
+.possible-detail svg, .auto-badge svg { width: 13px; height: 13px; }
+.possible-detail:hover { color: var(--fg); }
+.auto-badge { gap: 3px; padding: 0 5px; height: 18px; font-size: 11px; background: var(--softer); color: var(--fg); font-variant-numeric: tabular-nums; }
+.demo-chip { flex: none; font-size: 10px; padding: 0 5px; height: 16px; line-height: 16px; border-radius: 8px; color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Bell card, open: a summary with Start now, then the windows with their start times */
+.possible-body { padding: 4px 0 4px 18px; gap: 8px; }
+.possible-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.possible-sum { font-size: 12px; line-height: 1.4; min-width: 0; }
+.possible-sum .muted { color: var(--muted); }
+.possible-row .btn { flex: none; }
+.slots { gap: 6px 5px; }
+.slotcol { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.slot-time { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.possible-actions { display: none; }
+
+/* Session windows as small gauges: the fill is how much of that session to use */
+.possible { --aimc: var(--link); }
+.possible.final { --aimc: var(--warn); }
+.possible .slots { display: flex; flex-wrap: wrap; gap: 8px 6px; }
+.possible .slot, .possible .slot.use, .possible .slot.spare {
+  position: relative; display: block; width: 24px; height: 34px; padding: 0; border: 0; border-radius: 6px; overflow: hidden;
+  background: var(--track); box-shadow: inset 0 0 0 1px var(--line);
+}
+.possible .slot::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: var(--aim, 60%);
+  background: color-mix(in srgb, var(--aimc) 70%, transparent);
+}
+.possible .slot.now { box-shadow: inset 0 0 0 1px var(--fg); }
+.possible .slot.armed { box-shadow: inset 0 0 0 1.5px var(--fg); }
+.possible .slot.armed::after {
+  content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; margin: 0; border-radius: 50%; background: var(--fg);
+}
+.possible button.slot:hover, .possible button.slot:focus-visible { box-shadow: inset 0 0 0 1.5px var(--fg); outline: none; }
+.possible-sum b { font-weight: 600; }
+
+/* Session timeline: boxes sit between their boundary times (times alternate above and below) */
+.possible-body { padding: 2px 0 4px 18px; gap: 6px; }
+.tl { display: flex; align-items: center; padding: 13px 4px; position: relative; }
+.tl-seg { position: relative; min-width: 14px; }
+.tl-box, .possible .tl-box {
+  position: relative; display: block; width: calc(100% - 2px); height: 10px; margin: 0 1px; padding: 0; border: 0;
+  border-radius: 3px; overflow: hidden; background: var(--track); box-shadow: inset 0 0 0 1px var(--line);
+}
+.tl-box::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--aim, 60%); background: color-mix(in srgb, var(--aimc) 75%, transparent); }
+.tl-box.now { opacity: 0.75; }
+button.tl-box { cursor: pointer; }
+button.tl-box:hover, button.tl-box:focus-visible { box-shadow: inset 0 0 0 1.5px var(--fg); outline: none; }
+.tl-box.armed { box-shadow: inset 0 0 0 1.5px var(--fg); }
+.tl-box.armed::after { content: ''; position: absolute; right: 2px; top: 2px; width: 6px; height: 6px; border-radius: 50%; background: var(--fg); }
+.tl-t { position: absolute; left: 0; transform: translateX(-50%); font-size: 10px; line-height: 1; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none; }
+.tl-t.up { bottom: calc(100% + 3px); }
+.tl-t.down { top: calc(100% + 3px); }
+.tl-t.first { transform: none; }
+.tl-t.end { left: auto; right: 0; transform: none; }
+.tl-t::before { content: ''; position: absolute; left: 50%; width: 1px; height: 3px; background: var(--line); }
+.tl-t.up::before { top: calc(100% + 0px); }
+.tl-t.down::before { bottom: calc(100% + 0px); }
+.tl-t.first::before { left: 0; }
+.tl-t.end::before { left: auto; right: 0; }
+.possible-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.possible-foot, .possible-row, .possible .slots { display: none; }
+
+/* Timeline readability: clear times, black scheduled marker */
+.tl { padding: 15px 4px; }
+.tl-t { font-size: 11px; font-weight: 600; color: color-mix(in srgb, var(--fg) 85%, transparent); letter-spacing: 0.01em; }
+.tl-box.armed::after { width: 7px; height: 7px; top: 1px; right: 2px; background: var(--vscode-editor-background, var(--vscode-sideBar-background)); box-shadow: 0 0 0 1.5px var(--fg); }
+body.vscode-light .tl-t, body.vscode-high-contrast-light .tl-t { color: var(--fg); }
+
+/* Lighter fills with a clear border, so each session box reads on any theme */
+.tl-box, .possible .tl-box { height: 11px; box-shadow: none; border: 1px solid color-mix(in srgb, var(--aimc) 70%, transparent); box-sizing: border-box; background: color-mix(in srgb, var(--aimc) 10%, transparent); }
+.tl-box::before { background: color-mix(in srgb, var(--aimc) 55%, transparent); }
+.tl-box.now { opacity: 1; border-style: dashed; }
+button.tl-box:hover, button.tl-box:focus-visible { box-shadow: none; border-color: var(--fg); }
+.tl-box.armed { box-shadow: none; border: 1.5px solid var(--fg); }
+
+/* Each session box is filled completely: the boxes show the sessions, the header gives the aim */
+.tl-box::before { width: 100%; }
+
+/* The alert card uses three colours only: neutral greys, one blue accent, and black for a scheduled session */
+.possible-title svg { color: var(--aimc); }
+.demo-chip { color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.auto-badge { background: var(--softer); color: var(--fg); }
+
+/* ---------- One accent colour ----------
+   Everything that needs to stand out (links, live and "in use" marks, warnings, the weekly line, the
+   session boxes, the account pictures) uses one colour: the theme's accent (its focus colour, blue in
+   the default themes). The rest is the theme's text and grey tones. Red (the theme's error colour) is kept
+   only for real failures, a limit at 100% and the weekly reminder bell. A scheduled auto-start is marked in the text colour.
+   So the palette is three theme roles and nothing else: text (and its greys), accent, error.
+   Type scale: 10px tiny labels, 11px secondary, 12px small text, 13px body (the editor's), 14px figures. */
+:root {
+  --accent: var(--vscode-focusBorder, #0078d4);
+  --link: var(--accent);
+  --warn: var(--accent);
+  --ok: var(--accent);
+}
+.possible { --aimc: var(--accent); }
+
+/* A new day starts: a slightly wider gap before its first box */
+.tl-seg.day-start { margin-left: 3px; }
+.tl-seg.day-start::before { content: ''; position: absolute; left: -3px; top: -2px; bottom: -2px; width: 1px; background: var(--line); }
+.tl-box::before { background: color-mix(in srgb, var(--aimc) 40%, transparent); }
+
+/* Timeline, clean: borderless bars on a soft tint, solid accent when auto-start is on, neutral for now */
+.tl { padding: 15px 2px; }
+.tl-box, .possible .tl-box {
+  height: 8px; margin: 0 1.5px; width: calc(100% - 3px); border: 0; border-radius: 2px; box-shadow: none;
+  background: color-mix(in srgb, var(--accent) 28%, transparent); transition: background 0.12s ease, transform 0.12s ease;
+}
+.tl-box::before, .tl-box::after, .tl-box.armed::after { content: none; display: none; }
+.tl-box.now { background: color-mix(in srgb, var(--fg) 22%, transparent); border: 0; opacity: 1; }
+.tl-box.armed { background: var(--accent); border: 0; box-shadow: none; }
+button.tl-box:hover, button.tl-box:focus-visible { background: color-mix(in srgb, var(--accent) 55%, transparent); transform: scaleY(1.5); border: 0; box-shadow: none; }
+button.tl-box.armed:hover, button.tl-box.armed:focus-visible { background: var(--accent); }
+.tl-t { font-weight: 500; color: var(--muted); }
+.tl-t::before { display: none; }
+.tl-seg.day-start::before { top: -4px; bottom: -4px; }
+.possible-legend .sw { display: inline-block; width: 12px; height: 6px; border-radius: 2px; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+
+/* Timeline rows: one row of up to ~10 sessions, a "+N" chip for the rest, more rows when shown in full */
+.tl-lines { display: flex; flex-direction: column; gap: 2px; }
+.tl { align-items: center; }
+.tl-more {
+  flex: none; margin-left: 6px; height: 16px; padding: 0 6px; border: 0; border-radius: 8px; font: inherit; font-size: 10px; font-weight: 600;
+  color: var(--fg); background: var(--softer); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.tl-more:hover, .tl-more:focus-visible { background: color-mix(in srgb, var(--accent) 35%, transparent); outline: none; }
+
+/* Accounts: the week column shows use and time to reset ("44%  1d"); the bell sits on the picture */
+.acct, .acct-head { grid-template-columns: 18px minmax(0, 1fr) 36px 62px 58px; }
+@media (max-width: 250px) { .acct, .acct-head { grid-template-columns: 18px minmax(0, 1fr) 32px 56px 54px; column-gap: 4px; } }
+.acct-week { display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; }
+.acct-week .until { font-size: 10px; color: var(--muted); opacity: 0.85; font-variant-numeric: tabular-nums; }
+.active .avatar::after { display: none; } /* "In use" already says it */
+.avatar-alert {
+  position: absolute; right: -4px; bottom: -4px; width: 11px; height: 11px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--accent); color: var(--vscode-button-foreground, #fff);
+  box-shadow: 0 0 0 2px var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+.avatar-alert svg { width: 7px; height: 7px; stroke-width: 2; }
+.acct.sel .avatar-alert { box-shadow: 0 0 0 2px var(--sel); }
+.acct:hover .avatar-alert { box-shadow: 0 0 0 2px var(--hover); }
+/* Narrow sidebar: the days go under the percentage, so the names keep their room */
+@media (max-width: 250px) {
+  .acct, .acct-head { grid-template-columns: 18px minmax(0, 1fr) 30px 34px 50px; column-gap: 4px; }
+  .acct-week { flex-direction: column; align-items: center; gap: 0; line-height: 1.05; }
+  .acct-week .until { font-size: 10px; }
+}
+.acct-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Account pictures are round */
+.avatar, .owner { border-radius: 50%; }
+.owner.two { border-radius: 7px; }
+
+/* The bell (weekly reminder) is red everywhere: on the account picture and in the card's header */
+.avatar-alert { background: var(--err); color: var(--vscode-button-foreground, #fff); }
+.possible-title svg, .acct-alert, .acct-alert.final { color: var(--err); }
+
+/* Week column: "44% | 1d", the two parts split by a thin line; the header names both ("WEEK | RESET") */
+.acct, .acct-head { grid-template-columns: 18px minmax(0, 1fr) 34px 70px 58px; }
+.acct-week, .acct-head .week-head { display: inline-flex; align-items: baseline; justify-content: center; gap: 0; text-align: center; overflow: visible; }
+.acct-week > span:first-child, .acct-head .week-head > span:first-child { min-width: 30px; text-align: right; padding-right: 5px; }
+.acct-week .until, .acct-head .week-head .until { min-width: 26px; text-align: left; padding-left: 5px; border-left: 1px solid var(--line); }
+.acct-head .week-head .until { font-size: inherit; }
+@media (max-width: 250px) {
+  .acct, .acct-head { grid-template-columns: 18px minmax(0, 1fr) 30px 34px 50px; }
+  .acct-week { flex-direction: column; align-items: center; }
+  .acct-week > span:first-child { min-width: 0; padding: 0; text-align: center; }
+  .acct-week .until { min-width: 0; padding: 0; border: 0; text-align: center; }
+  .acct-head .week-head .until { display: none; }
+  .acct-head .week-head > span:first-child { min-width: 0; padding: 0; }
+}
+
+/* The bell on the account picture: just the red bell, no circle behind it */
+.avatar-alert { background: none; box-shadow: none; width: 11px; height: 11px; right: -5px; bottom: -5px; color: var(--err); }
+.avatar-alert svg { width: 11px; height: 11px; stroke-width: 1.8; filter: drop-shadow(0 0 1px var(--vscode-sideBar-background, var(--vscode-editor-background))) drop-shadow(0 0 1px var(--vscode-sideBar-background, var(--vscode-editor-background))); }
+.acct.sel .avatar-alert, .acct:hover .avatar-alert { box-shadow: none; }
+
+/* Two marks on the picture, each in its usual place:
+   the account in use: a small dot at the bottom right (like a presence dot),
+   a weekly reminder: the red bell at the top right (like a notification). */
+.active .avatar::after {
+  display: block; content: ''; position: absolute; right: -2px; bottom: -2px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+.acct.sel.active .avatar::after { box-shadow: 0 0 0 2px var(--sel); }
+.acct.active:hover .avatar::after { box-shadow: 0 0 0 2px var(--hover); }
+.avatar-alert { top: -6px; right: -6px; bottom: auto; }
+.active .avatar::after { width: 8px; height: 8px; right: -3px; bottom: -3px; }
+
+/* The bell: after the name; on the picture's top right only when the name is cut off */
+.acct-name { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.acct-label { min-width: 0; }
+.acct-bell { flex: none; display: inline-flex; color: var(--err); }
+.acct-bell svg { width: 12px; height: 12px; }
+.avatar-alert { display: none; }
+.acct.bell-on-pic .acct-bell { display: none; }
+.acct.bell-on-pic .avatar-alert { display: grid; }
+
+/* Narrow panel: the bell takes the place of the letter in the picture, with a soft cross-fade.
+   Wide panel: the letter is back and the bell sits after the name. */
+.avatar { overflow: visible; }
+.av-letter, .av-bell { transition: opacity 0.22s ease, transform 0.22s ease; }
+.avatar .av-bell {
+  display: grid; place-items: center; position: absolute; inset: 0; width: auto; height: auto; top: 0; right: 0; bottom: 0; left: 0;
+  margin: 0; background: none; box-shadow: none; color: var(--err); opacity: 0; transform: scale(0.6); pointer-events: none;
+}
+.avatar .av-bell svg { width: 11px; height: 11px; filter: none; stroke-width: 1.8; }
+.acct.bell-on-pic .av-letter { opacity: 0; transform: scale(0.6); }
+.acct.bell-on-pic .avatar .av-bell { opacity: 1; transform: none; pointer-events: auto; }
+.acct.bell-on-pic .avatar { background: color-mix(in srgb, var(--err) 16%, transparent); transition: background 0.22s ease; }
+.avatar { transition: background 0.22s ease; }
+.acct-bell { transition: opacity 0.22s ease; }
+.acct.bell-on-pic .acct-bell { display: inline-flex; opacity: 0; width: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .av-letter, .av-bell, .acct-bell, .avatar { transition: none; } }
+
+.sort-btn { color: var(--muted); }
+.sort-btn.on { color: var(--fg); }

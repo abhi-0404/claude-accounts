@@ -5,8 +5,8 @@ const HOUR = 3600 * 1000;
 const FIVE_H = 5 * HOUR;
 const WEEK = 7 * 24 * HOUR;
 const DAY = 24 * HOUR;
-const KEEP = 100 * DAY; // enough for the 3-month view
-const DETAIL = 14 * DAY; // older samples keep only weekly changes, to stay small
+const KEEP = 3 * 365 * DAY; // every session and weekly sample is kept for three years (for the history views and for learning your pattern)
+const DETAIL = 120 * DAY; // older samples keep only weekly changes, to stay small
 // Until enough is learned: one full 5-hour session uses about this share of the weekly limit.
 const DEFAULT_SHARE = 0.125;
 
@@ -108,7 +108,7 @@ function record(store, accountKey, plan, now = Date.now()) {
     const keep = x.at >= detail || !prev || prev.w !== x.w || prev.we !== x.we;
     if (keep) prev = x;
     return keep;
-  }).slice(-20000);
+  }).slice(-60000);
   for (const id of Object.keys(acc.windows)) if (acc.windows[id].end < cutoff) delete acc.windows[id];
   return changed;
 }
@@ -297,6 +297,30 @@ function weeklyAlert(plan, share, now = Date.now(), pace = DEFAULT_PACE) {
   const maxReach = Math.min(100, w.percent + fit * perSession);
   if (projected >= 97) return null; // on track
 
+  // Each 5-hour window that still fits before the reset, from now: the current session first, then back to back.
+  // Reset times carry fractions of a second that wobble between checks; whole minutes keep the windows steady.
+  const minute = (ms) => Math.round(ms / 60000) * 60000;
+  const slots = [];
+  const endR = minute(end);
+  let t = now;
+  if (inSession) {
+    t = minute(sEnd);
+    slots.push({ start: now, end: t, current: true, left: Math.round(currentLeft * 100) });
+  }
+  while (t + HOUR <= endR && slots.length < 40) {
+    slots.push({ start: t, end: Math.min(t + FIVE_H, endR), partial: t + FIVE_H > endR });
+    t += FIVE_H;
+  }
+
+  // How much of each window to use to finish the week: what is left, divided by what the windows can add.
+  const capacity = (x) => (x.current ? x.left / 100 : Math.min(1, (x.end - x.start) / FIVE_H));
+  const totalCapacity = slots.reduce((sum, x) => sum + capacity(x), 0);
+  const frac = totalCapacity > 0 && perSession > 0 ? Math.min(1, unused / (totalCapacity * perSession)) : 1;
+  for (const x of slots) {
+    x.aim = Math.round(frac * 100); // % of this window to use
+    x.gain = Math.round(frac * capacity(x) * perSession * 10) / 10; // about this much added to the week
+  }
+
   const level = hoursLeft <= 12 || need >= fit * 0.85 ? 'final' : 'reminder';
   const r1 = (v) => Math.round(v * 10) / 10;
   return {
@@ -315,7 +339,77 @@ function weeklyAlert(plan, share, now = Date.now(), pace = DEFAULT_PACE) {
     inSession,
     sessionLeft: inSession ? Math.round(currentLeft * 100) : 0,
     sessionEndsAt: inSession ? s.resetsAt : null,
+    slots,
+    aim: Math.round(frac * 100),
   };
 }
 
-module.exports = { emptyStore, record, normalize, pattern, learnedShare, weekSummary, weeklyAlert, series, cycles, DEFAULT_SHARE, FIVE_H, WEEK };
+/** A made-up plan that always raises the weekly alert, for testing the alert and the session windows. */
+function demoPlan(now = Date.now()) {
+  const iso = (ms) => new Date(ms).toISOString();
+  return {
+    session: { percent: 51, resetsAt: iso(now + 2 * HOUR + 11 * 60000), severity: 'normal' },
+    weekly: { percent: 31, resetsAt: iso(now + 30 * HOUR), severity: 'normal' },
+  };
+}
+
+/**
+ * What was used in a window: replies and tokens per model, from the chat transcripts.
+ * records: [{ t, model, input, cacheRead, output }]; nameOf turns a model id into its short name.
+ */
+function modelMix(records, start, end, nameOf = (m) => m) {
+  const mix = {};
+  for (const r of records) {
+    if (r.t < start || r.t > end || !r.model || /^<.*>$/.test(r.model)) continue;
+    const name = nameOf(r.model);
+    const m = (mix[name] = mix[name] || { replies: 0, tokens: 0 });
+    m.replies += 1;
+    m.tokens += (r.input || 0) + (r.cacheRead || 0) + (r.output || 0);
+  }
+  return mix;
+}
+
+/**
+ * One row per 5-hour session ever recorded, oldest first, for export and later analysis:
+ * when, how far the session went, what it added to the week, and which models were used.
+ * labels: account key -> name. Effort is reserved (Claude does not record it yet).
+ */
+function exportRows(store, labels = {}) {
+  const rows = [];
+  for (const key of Object.keys(store.accounts)) {
+    const acc = store.accounts[key];
+    const slots = series(store, key, 0).slots;
+    for (const s of slots) {
+      const w = Object.values(acc.windows).find((x) => x.start === s.start) || {};
+      rows.push({
+        account: labels[key] || key,
+        start: new Date(s.start).toISOString(),
+        end: new Date(s.end).toISOString(),
+        sessionPeakPercent: s.peak,
+        weeklyPercentAtEnd: s.weekly,
+        weeklyPercentAdded: s.weeklyUsed,
+        models: w.models || null,
+        effort: null,
+      });
+    }
+  }
+  return rows.sort((a, b) => a.start.localeCompare(b.start));
+}
+
+const csvCell = (v) => {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+/** The rows as CSV; the model mix becomes one "Name replies/tokens" text per row. */
+function toCsv(rows) {
+  const head = ['account', 'start', 'end', 'sessionPeakPercent', 'weeklyPercentAtEnd', 'weeklyPercentAdded', 'models', 'effort'];
+  const lines = [head.join(',')];
+  for (const r of rows) {
+    const models = r.models ? Object.entries(r.models).map(([n, m]) => `${n} ${m.replies} replies ${m.tokens} tokens`).join('; ') : '';
+    lines.push([r.account, r.start, r.end, r.sessionPeakPercent, r.weeklyPercentAtEnd, r.weeklyPercentAdded, models, r.effort].map(csvCell).join(','));
+  }
+  return lines.join('\n');
+}
+
+module.exports = { modelMix, exportRows, toCsv, demoPlan, emptyStore, record, normalize, pattern, learnedShare, weekSummary, weeklyAlert, series, cycles, DEFAULT_SHARE, FIVE_H, WEEK };

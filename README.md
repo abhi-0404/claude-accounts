@@ -49,7 +49,7 @@ From most to least used:
 |---|---|
 | **Accounts** | Every account with its 5-hour and weekly usage. **Switch** moves Claude to that account without reloading VS Code. Drag to reorder. Right-click for sign out, usage page and more. |
 | **Chats & projects** | **New session** opens a fresh chat tab with the selected account. **Chats** lists the chats that account ran, grouped by project (the open folder first); click one to continue it. **Projects** lists the folders that account worked in; click one to open it. Switch to **All** to see every account's chats or projects, each marked with the accounts that ran it. Search, and delete a chat (it goes to the trash). A green dot marks a chat running right now. |
-| **Usage** | The selected account's 5-hour and weekly limits with when they reset, and extra credits; the header shows how fresh the numbers are, with a refresh button. Usage also refreshes by itself every few minutes while the panel is open and the window is focused, and right away when you pick another account. **History & models** (folded) shows one frame at a time, **Weekly** or **Monthly** (a month draws the weekly limit as a saw-tooth that starts again at each reset): a smooth line of the weekly limit over its 5-hour session bars, dotted lines at the two resets, and a marker at now. Move the mouse onto the line to read it, or onto a bar to see that session's use; use the arrows or drag the chart for earlier weeks, and zoom with + and -. Models shows token share per model. |
+| **Usage** | The selected account's 5-hour and weekly limits with when they reset, and extra credits; the header shows how fresh the numbers are, with a refresh button. Usage also refreshes by itself every 30 seconds while the panel is open and the window is focused, and right away when you pick another account. **History & models** (folded) shows one frame at a time, **Weekly** or **Monthly** (a month draws the weekly limit as a saw-tooth that starts again at each reset): a smooth line of the weekly limit over its 5-hour session bars, dotted lines at the two resets, and a marker at now. Move the mouse onto the line to read it, or onto a bar to see that session's use; use the arrows or drag the chart for earlier weeks, and zoom with + and -. Models shows token share per model. |
 
 ## The chat tab
 
@@ -61,9 +61,23 @@ Click a chat or **New session** in the panel (or run **Claude Accounts: New Sess
 - Attach the open file or the selected lines with the two buttons left of the model.
 - Switching accounts moves an open chat over after its current reply. Usage updates after every reply, on any platform.
 
-### Weekly reminders
+### Weekly reminders and session windows
 
-If an account is likely to leave a good part of its weekly limit unused, a bell appears next to its name. With that account selected, the Usage section shows one box for each 5-hour session that still fits before the reset, filled for the sessions you would need to use what is left, with a **Start** button. A notification offers the same once per reset; turn it off with `claudeAccounts.weeklyReminders`. The reminder learns your usual pace (sessions per day, how much of each you use).
+If an account is likely to leave a good part of its weekly limit unused, a bell appears next to its name. With that account selected, the Usage section shows a card that folds to one line (click it to open or close; your choice is remembered; a clock badge shows how many auto-starts are set).
+
+Its header gives the advice, for example **"Aim for 60% per session"** (how much of each session to use to finish the week). Open, it shows a small timeline from now to the weekly reset: each box is one 5-hour session, placed between its start and end times and filled to the aim. Hover a box for that session and what it adds to the week; the info icon explains why (your usual pace, where that pace ends, the best case). **Start now** opens a new session. A notification is rare: at most one reminder and one final alert per account and week, never while you are using that account, never within hours of another, and only in one window. The notification has a **Mute Reminders** button, or turn it off with `claudeAccounts.weeklyReminders`.
+
+**Auto-start (optional):** click a future window to schedule it. At its start time, if no window is running, the extension sends one tiny message ("hi") with the cheapest model (Haiku) and nothing saved to your chat list, so the window begins on time even if you forget. The schedule then removes itself. It runs while VS Code is open; if VS Code was closed at that time, the schedule is dropped and you are told. Click the window again to cancel.
+
+**Where to see what is scheduled:** a clock in the status bar (the next time, and "+2" for more; hover for the list, click to cancel), the clock badge on the card, and the command **Claude Accounts: Show Scheduled Auto-Starts**. Schedules are saved, so refreshing the panel, switching accounts or reloading the window never loses them.
+
+**Try it without waiting:** run **Claude Accounts: Test: Simulate Weekly Alert** to show a made-up alert (bell, notification and session windows) for 15 minutes, and **Claude Accounts: Test: Auto-Start in One Minute** to watch a real auto-start run.
+
+## Your usage history
+
+The extension keeps a local record of every 5-hour session (how far it went, when it started and ended), the weekly percentage over time, and which models each finished session used (replies and tokens per model, read from your chat transcripts). It is kept for three years, stays on your computer and is never sent anywhere. It is what makes the "aim" in the weekly reminder possible, and it is the base for learning how much each session should use, with which model, to finish a week.
+
+Run **Claude Accounts: Export Usage History** to save it as JSON or CSV (one row per session) for your own analysis. Sessions are matched to chats by time, so when two accounts are used at the same moment a session can include the other account's replies. An effort column is reserved and stays empty, because Claude does not record effort yet.
 
 ## Live usage (Windows)
 
@@ -81,7 +95,7 @@ On macOS and Linux, usage updates whenever Claude saves it, or with the refresh 
 |---|---|
 | "Not found" next to an account | Claude Code is not installed. Install it (the `claude` command), or set `claudeAccounts.claudePath`. |
 | An account says **Sign in** | Click it and finish in the browser. The panel notices by itself. |
-| Usage looks old | Press the refresh icon in the Usage header. Numbers older than a few minutes refresh on their own while the panel is open. |
+| Usage looks old | Press the refresh icon in the Usage header. Numbers refresh on their own every 30 seconds while the panel is open. |
 | Two accounts look alike | Give them different names. Pictures show the account's initial, with more letters when initials clash. |
 | A chat will not open | Its project folder may have moved or been deleted. The message says which folder is missing. |
 
@@ -99,7 +113,8 @@ Nothing moves. Your default login stays in `~/.claude` (on Windows `C:\Users\<yo
 | `claudeAccounts.accounts` | empty | Your accounts: `{ "label", "configDir" }`. Empty `configDir` is the default `~/.claude`. Usually managed from the panel. |
 | `claudeAccounts.homeDir` | empty | Optional shared home (see above). |
 | `claudeAccounts.liveUsage` | on | Live usage through the relay (Windows). |
-| `claudeAccounts.autoRefresh` | on | Check usage by itself every few minutes while the panel is open. |
+| `claudeAccounts.autoRefresh` | on | Check usage by itself while the panel is open. |
+| `claudeAccounts.refreshSeconds` | 30 | Seconds between those checks (15 to 600). |
 | `claudeAccounts.weeklyReminders` | on | Notify when a weekly limit is likely to go partly unused. |
 | `claudeAccounts.claudePath` | `claude` | The Claude command. If `claude` isn't installed, the copy inside the Claude Code extension is used. |
 

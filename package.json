@@ -131,6 +131,26 @@
         "command": "claudeAccounts.rate",
         "title": "Rate Claude Accounts",
         "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.autoStarts",
+        "title": "Show Scheduled Auto-Starts",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.simulateAlert",
+        "title": "Test: Simulate Weekly Alert",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.testAutoStart",
+        "title": "Test: Auto-Start in One Minute",
+        "category": "Claude Accounts"
+      },
+      {
+        "command": "claudeAccounts.exportUsage",
+        "title": "Export Usage History",
+        "category": "Claude Accounts"
       }
     ],
     "menus": {
@@ -324,13 +344,21 @@
           "type": "boolean",
           "scope": "application",
           "default": true,
-          "description": "Keep usage up to date by checking with Claude every few minutes while the panel is open and the window is focused."
+          "description": "Keep usage up to date by checking with Claude while the panel is open and the window is focused. See refreshSeconds for how often."
         },
         "claudeAccounts.weeklyReminders": {
           "type": "boolean",
           "scope": "application",
           "default": true,
           "description": "Show a reminder when an account is likely to leave a good part of its weekly limit unused."
+        },
+        "claudeAccounts.refreshSeconds": {
+          "type": "number",
+          "scope": "application",
+          "default": 30,
+          "minimum": 15,
+          "maximum": 600,
+          "description": "How often, in seconds, usage is checked automatically while the panel is open and the window is focused. Replies in a chat tab update it instantly anyway."
         }
       }
     }

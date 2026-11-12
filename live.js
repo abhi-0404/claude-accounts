@@ -245,4 +245,16 @@ function nextReset(plans, now = Date.now()) {
   return soonest;
 }
 
-module.exports = { UsageClient, planFromLive, fetchUsageOnce, mergePlans, liveDir, liveKey, planFromEvent, choosePlan, applyResets, nextReset };
+/**
+ * A usage check that tells something new (a different percentage or reset time than what is shown) is
+ * the newest truth, so it counts as fetched now. Without this, an answer that matched Claude's older saved
+ * copy kept that copy's time and lost to the "just reset" placeholder: a window that had just started
+ * (for example by an auto-start) stayed invisible until the next reply.
+ */
+function acceptLive(current, merged, now = Date.now()) {
+  if (!merged) return merged;
+  const same = current && sameLimit(merged.session, current.session) && sameLimit(merged.weekly, current.weekly);
+  return same ? merged : { ...merged, fetchedAt: Math.max(merged.fetchedAt || 0, now) };
+}
+
+module.exports = { acceptLive, UsageClient, planFromLive, fetchUsageOnce, mergePlans, liveDir, liveKey, planFromEvent, choosePlan, applyResets, nextReset };

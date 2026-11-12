@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Weekly alert test</title>
+<link rel="stylesheet" href="/theme.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: #1f1f1f; color: #cccccc; font: 13px "Segoe UI", sans-serif; display: grid; grid-template-rows: 1fr 24px; margin: 0; }
+  .main { display: grid; grid-template-columns: 340px 1fr; min-height: 0; }
+  .side { background: #181818; border-right: 1px solid #2b2b2b; min-height: 0; display: flex; flex-direction: column; }
+  .side .head { padding: 10px 14px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #bbb; }
+  .side iframe { flex: 1; border: 0; width: 100%; min-height: 0; }
+  .stage { padding: 28px 36px; overflow: auto; max-width: 760px; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #fff; font-weight: 600; }
+  p.lead { margin: 0 0 18px; color: #9d9d9d; }
+  .steps { display: grid; gap: 12px; }
+  .step { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; background: #252526; border: 1px solid #333; border-radius: 6px; }
+  .step .n { width: 24px; height: 24px; border-radius: 50%; background: #0078d4; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .step b { color: #fff; font-weight: 600; }
+  .step span.d { color: #9d9d9d; display: block; margin-top: 2px; }
+  button.t { font: inherit; color: #fff; background: #0078d4; border: 0; border-radius: 4px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+  button.t.alt { background: #313131; color: #ccc; }
+  button.t:hover { filter: brightness(1.12); }
+  label.chk { display: flex; gap: 8px; align-items: center; margin-top: 14px; color: #9d9d9d; }
+  /* notifications, like VS Code's */
+  #toasts { position: fixed; right: 16px; bottom: 36px; display: grid; gap: 8px; width: 400px; z-index: 10; }
+  .toast { background: #202020; border: 1px solid #454545; border-radius: 4px; padding: 12px 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); animation: pop 0.25s ease; }
+  .toast .msg { line-height: 1.45; }
+  .toast .row { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+  .toast.warn { border-left: 3px solid #cca700; }
+  .toast.info { border-left: 3px solid #3794ff; }
+  .toast.ok { border-left: 3px solid #73c991; }
+  @keyframes pop { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* status bar */
+  .status { display: flex; align-items: center; justify-content: space-between; padding: 0 10px; background: #181818; border-top: 1px solid #2b2b2b; font-size: 12px; color: #9d9d9d; position: relative; }
+  .status .left, .status .right { display: flex; gap: 14px; align-items: center; }
+  .clockbtn { color: #fff; background: #3a3a3a; border: 0; font: inherit; padding: 2px 8px; border-radius: 3px; cursor: pointer; }
+  .clockbtn[hidden] { display: none; }
+  #pop { position: absolute; right: 8px; bottom: 28px; background: #202020; border: 1px solid #454545; border-radius: 4px; min-width: 300px; padding: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  #pop[hidden] { display: none; }
+  #pop .it { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 6px 8px; border-radius: 3px; }
+  #pop .it:hover { background: #2a2d2e; }
+  #pop small { color: #9d9d9d; display: block; padding: 4px 8px; }
+</style></head>
+<body>
+<div class="main">
+  <div class="side"><div class="head">Claude Accounts</div><iframe id="panel" src="/alert-panel.html"></iframe></div>
+  <div class="stage">
+    <h1>Weekly alert and auto-start: try it in the browser</h1>
+    <p class="lead">This page plays what the extension does, with made-up accounts. Nothing here uses your real usage, and no message is sent.</p>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div><b>Show the alert</b><span class="d">Like the command "Test: Simulate Weekly Alert": a notification, the bell, and the session windows card.</span></div><button class="t" id="b-alert">Simulate weekly alert</button></div>
+      <div class="step"><div class="n">2</div><div><b>Look at the card</b><span class="d">Hover a window for its times. Click the card's title line to fold it. Click a later window to turn its auto-start on or off.</span></div><span></span></div>
+      <div class="step"><div class="n">3</div><div><b>Watch the status bar</b><span class="d">A clock appears at the bottom right while an auto-start is set. Click it to see or cancel.</span></div><button class="t alt" id="b-test">Auto-start in 1 minute</button></div>
+      <div class="step"><div class="n">4</div><div><b>Skip the wait</b><span class="d">Run the next auto-start right now to see what happens when its time comes.</span></div><button class="t alt" id="b-fire">Run next now</button></div>
+      <div class="step"><div class="n">5</div><div><b>Many sessions</b><span class="d">See how the card stays small as the number of sessions until the reset grows. Try a narrow panel too.</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="t alt" data-n="3">3</button><button class="t alt" data-n="7">7</button><button class="t alt" data-n="10">10</button><button class="t alt" data-n="15">15</button>
+        <button class="t alt" id="b-narrow">Narrow</button></div></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="running"> A session window is already running (the auto-start should then be skipped)</label>
+  </div>
+</div>
+<div class="status"><div class="left"><span id="acct">Work · 18%</span><span>main</span></div><div class="right"><button class="clockbtn" id="clock" hidden></button><span>TypeScript</span></div>
+  <div id="pop" hidden></div></div>
+<div id="toasts"></div>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const frame = $('#panel');
+  const cmd = (m) => frame.contentWindow.postMessage({ demoCmd: true, ...m, demoCmd: m.demoCmd }, '*');
+  let alertOn = false;
+  let list = [];
+  let selected = 'Personal';
+  const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const when = (ms) => new Date(ms).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+
+  function toast(text, kind = 'info', buttons = []) {
+    const el = document.createElement('div');
+    el.className = `toast ${kind}`;
+    el.innerHTML = `<div class="msg"></div><div class="row"></div>`;
+    el.querySelector('.msg').textContent = text;
+    const row = el.querySelector('.row');
+    for (const b of buttons.concat([{ label: 'Close', alt: true }])) {
+      const btn = document.createElement('button');
+      btn.className = 't' + (b.alt ? ' alt' : '');
+      btn.textContent = b.label;
+      btn.onclick = () => { el.remove(); b.run && b.run(); };
+      row.appendChild(btn);
+    }
+    $('#toasts').appendChild(el);
+    setTimeout(() => el.remove(), 14000);
+  }
+
+  window.addEventListener('message', (e) => {
+    const m = e.data || {};
+    if (!m.sim) return;
+    if (m.kind === 'notify') toast(m.text, m.level === 'final' ? 'warn' : 'info', m.level ? [{ label: 'Start Session' }] : []);
+    if (m.kind === 'status') toast(m.text, m.ok ? 'ok' : 'info');
+    if (m.kind === 'selected') selected = m.label;
+    if (m.kind === 'autos') {
+      list = m.list;
+      const b = $('#clock');
+      b.hidden = !list.length;
+      if (list.length) b.textContent = `⏲ ${clock(list[0].start)}${list.length > 1 ? ` +${list.length - 1}` : ''}`;
+      b.title = ['Auto-start set (one tiny message starts the session window)', ...list.map((x) => `${x.label}: ${when(x.start)}`), 'Click to see or cancel'].join('\n');
+      if (!list.length) $('#pop').hidden = true;
+      else if (!$('#pop').hidden) drawPop();
+    }
+  });
+
+  function drawPop() {
+    const pop = $('#pop');
+    pop.innerHTML = '<small>Scheduled auto-starts. Pick one to cancel it.</small>';
+    for (const x of list) {
+      const it = document.createElement('div');
+      it.className = 'it';
+      it.innerHTML = `<span>⏲ ${x.label}</span><span style="color:#9d9d9d">${when(x.start)}</span><button class="t alt">Cancel</button>`;
+      it.querySelector('button').onclick = () => cmd({ demoCmd: 'cancel', key: x.key, start: x.start });
+      pop.appendChild(it);
+    }
+  }
+  $('#clock').onclick = () => { const p = $('#pop'); p.hidden = !p.hidden; if (!p.hidden) drawPop(); };
+
+  $('#b-alert').onclick = () => {
+    alertOn = !alertOn;
+    $('#b-alert').textContent = alertOn ? 'Turn the test alert off' : 'Simulate weekly alert';
+    if (!alertOn) toast('The test alert is off.', 'info');
+    cmd({ demoCmd: 'alert', on: alertOn });
+  };
+  $('#b-test').onclick = () => cmd({ demoCmd: 'testAuto' });
+  $('#b-fire').onclick = () => cmd({ demoCmd: 'fireNow' });
+  document.querySelectorAll('[data-n]').forEach((b) => (b.onclick = () => { if (!alertOn) $('#b-alert').click(); cmd({ demoCmd: 'slots', n: Number(b.dataset.n) }); }));
+  $('#b-narrow').onclick = () => {
+    const m = document.querySelector('.main');
+    const narrow = m.style.gridTemplateColumns !== '240px 1fr';
+    m.style.gridTemplateColumns = narrow ? '240px 1fr' : '';
+    $('#b-narrow').textContent = narrow ? 'Wide' : 'Narrow';
+  };
+  $('#running').onchange = (e) => cmd({ demoCmd: 'running', on: e.target.checked });
+</script>
+</body></html>
